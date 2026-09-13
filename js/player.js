@@ -85,13 +85,17 @@
   }
   N.playerActivity = function () {
     if (!root) return;
+    var ui = root.querySelector(".player-ui");
+    var sideActions = root.querySelector(".player-side-actions");
     root.classList.remove("idle");
-    root.querySelector(".player-ui").classList.remove("hidden");
+    if (ui) ui.classList.remove("hidden");
+    if (sideActions) sideActions.classList.remove("hidden");
     clearTimeout(hideTimer);
     hideTimer = setTimeout(function () {
       if (root) {
         root.classList.add("idle");
-        root.querySelector(".player-ui").classList.add("hidden");
+        if (ui) ui.classList.add("hidden");
+        if (sideActions) sideActions.classList.add("hidden");
       }
     }, 3000);
   };

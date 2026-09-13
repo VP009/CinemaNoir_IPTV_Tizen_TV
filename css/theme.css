@@ -192,6 +192,13 @@ select[data-focused="true"] {
   z-index: 10;
   pointer-events: auto;
 }
+.player-side-actions {
+  transition: opacity 0.15s ease;
+}
+.player-side-actions.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
 .player-ui button:focus {
   background: var(--purple-action);
   border-color: #ddd6fe;

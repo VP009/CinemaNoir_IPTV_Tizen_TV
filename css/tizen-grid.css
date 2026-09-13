@@ -1,0 +1,114 @@
+/* Fixed frames, mathematical tracks. Loaded last to replace legacy scroll rules. */
+:root{
+  --safe-x:48px;--safe-y:32px;
+  --space-xs:8px;--space-sm:12px;--space-md:20px;--space-lg:28px;--space-xl:40px;
+  --radius-sm:8px;--radius-md:12px;--radius-lg:18px;
+  --focus-scale:1.04;
+  --poster-height:320px;--poster-image-height:260px;--poster-gap-y:32px;
+  --category-width:320px;--category-height:76px;--category-gap:14px;
+  --episode-height:80px;--episode-gap:12px;
+  --font-xs:16px;--font-sm:18px;--font-md:22px;--font-lg:28px;--font-xl:36px;--font-xxl:48px;
+  --focus-duration:90ms;--scroll-duration:140ms;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{width:100%;height:100%;margin:0;overflow:hidden}
+.full-viewport{top:var(--safe-y);right:var(--safe-x);bottom:var(--safe-y);left:var(--safe-x)}
+.catalog-page{display:flex;height:100%;min-height:0;flex-direction:column;overflow:hidden}
+.catalog-page>.section-head{flex:0 0 auto}
+.catalog-layout{display:flex!important;flex:1 1 auto;height:100%;min-height:0;overflow:hidden;align-items:stretch!important}
+.category-scroll,.grid-scroll{position:relative;height:100%;min-height:0;overflow:hidden!important}
+.category-scroll{flex:0 0 var(--category-width)}
+.grid-scroll{flex:1 1 auto;min-width:0}
+.channel-scroll,.search-scroll,.season-scroll,.standalone-grid-viewport,.focus-viewport{position:relative;min-height:0;overflow:hidden!important}
+.category-list,.media-grid,.episode-grid,.season-list,.vertical-track,.horizontal-track{position:relative;min-height:0;padding:0!important;align-content:start;align-items:start;will-change:transform;transition:transform var(--scroll-duration) ease-out!important}
+.media-grid{grid-template-columns:repeat(6,minmax(0,1fr));grid-auto-rows:var(--poster-height);column-gap:var(--space-lg);row-gap:var(--poster-gap-y)}
+.media-grid>.poster{height:var(--poster-height);width:100%;margin:0}
+.media-grid>.poster>img{width:100%;height:var(--poster-image-height)!important;object-fit:cover}
+.media-grid>.load-more{height:var(--poster-height)}
+.category-list{grid-template-columns:1fr;grid-auto-rows:var(--category-height);row-gap:var(--category-gap)}
+.category-list>.category-item{height:var(--category-height);margin:0;min-height:0;padding:12px 18px;font-size:var(--font-md);gap:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.episode-grid{grid-template-columns:1fr;grid-auto-rows:var(--episode-height);row-gap:var(--episode-gap)}
+.episode-grid>.episode{height:var(--episode-height);min-height:0;margin:0;padding:14px 20px;font-size:var(--font-md);gap:18px}
+.season-scroll{height:92px;flex:0 0 92px}
+.season-list{display:flex;width:max-content;gap:16px}
+.season-list>.season-button{width:210px;height:76px;margin:0;padding:12px 18px;font-size:var(--font-md)}
+.episode-scroll{flex:1 1 auto}
+.grid-scroll,.category-scroll{border:10px solid transparent}
+.live-layout .grid-scroll{flex:0 0 390px}
+.live-layout .live-preview{flex:1 1 auto;min-width:0}
+.live-layout .media-grid{grid-template-columns:1fr;grid-auto-rows:100px;row-gap:12px}
+.live-layout .media-grid>.poster,.live-layout .media-grid>.load-more{height:100px;min-height:0}
+.live-layout .media-grid>.poster>img{height:86px!important}
+.poster{transform:translateZ(0);transition:transform var(--focus-duration) ease-out,box-shadow var(--focus-duration) ease-out,background-color var(--focus-duration) ease-out}
+.poster.focused,.poster[data-focused="true"]{will-change:transform;transform:translateZ(0) scale(var(--focus-scale))!important;box-shadow:0 0 0 3px #c4b5fd,0 8px 18px rgba(0,0,0,.45);z-index:10}
+.category-item,.episode,.season-button,.load-more{transition:transform var(--focus-duration) ease-out,box-shadow var(--focus-duration) ease-out,background-color var(--focus-duration) ease-out}
+button .ui-icon,.toolbar-action .ui-icon,header button .ui-icon{filter:none!important;transition:color var(--focus-duration) ease-out,transform var(--focus-duration) ease-out!important}
+.poster .label{height:60px;padding:15px 13px;font-size:var(--font-md)}
+.section-head{height:92px;gap:var(--space-md)}
+.section-head h1{font-size:var(--font-xl)}
+.section-head input{min-height:64px;font-size:var(--font-md)}
+.detail-page>img{width:280px;height:420px;object-fit:cover}
+.detail-page h1{font-size:var(--font-xxl)}
+.detail-page p{font-size:var(--font-md)}
+.player.player-page,.player.player-page .player-ui,.player.player-page .video-player{width:100%;height:100%}
+.player.player-page.avplay{background:transparent!important}
+.avplay-plane{position:absolute;left:0;top:0;width:100%;height:100%;z-index:0}
+
+/* Linha do tempo dimensionada para leitura e foco a distância em Smart TVs. */
+.player-progress-wrapper{
+  width:94%!important;
+  max-width:1720px!important;
+  min-height:82px;
+  gap:24px!important;
+  padding:20px 18px!important;
+}
+.player-progress-wrapper .progress{
+  position:relative;
+  flex:1 1 auto;
+  height:16px!important;
+  overflow:visible;
+  border:2px solid rgba(255,255,255,.22);
+  border-radius:999px;
+  background:rgba(255,255,255,.24);
+  box-shadow:0 3px 14px rgba(0,0,0,.5);
+}
+.player-progress-wrapper .progress i{
+  position:relative;
+  display:block;
+  height:100%;
+  min-width:0;
+  border-radius:999px;
+  background:linear-gradient(90deg,#8b5cf6,#c4b5fd);
+  box-shadow:0 0 16px rgba(139,92,246,.72);
+}
+.player-progress-wrapper .progress i::after{
+  content:"";
+  position:absolute;
+  top:50%;
+  right:-11px;
+  width:22px;
+  height:22px;
+  border:4px solid #fff;
+  border-radius:50%;
+  background:#8b5cf6;
+  box-shadow:0 0 18px rgba(196,181,253,.95);
+  transform:translateY(-50%);
+}
+.player-progress-wrapper .time{
+  min-width:230px!important;
+  font-size:25px;
+  font-variant-numeric:tabular-nums;
+  font-weight:700;
+}
+.player-progress-wrapper:focus .progress,
+.player-progress-wrapper[data-focused="true"] .progress{
+  border-color:#ddd6fe;
+  box-shadow:0 0 0 3px rgba(139,92,246,.35),0 0 24px rgba(139,92,246,.5);
+}
+@media(max-width:1399px){
+  :root{--safe-x:32px;--safe-y:24px;--category-width:280px}
+  .media-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .detail-page>img{width:240px;height:360px}
+}
+.fast-navigation .poster{transition-duration:50ms}
+.fast-navigation .media-grid,.fast-navigation .category-list,.fast-navigation .episode-grid{transition-duration:90ms!important}

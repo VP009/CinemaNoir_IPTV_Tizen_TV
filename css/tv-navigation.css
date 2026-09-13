@@ -1,0 +1,15 @@
+html,body,#app{width:100%;height:100%;margin:0;overflow:hidden!important}
+#app{position:fixed;top:0;right:0;bottom:0;left:0;width:100vw;height:100vh;overflow:hidden}
+.viewport{overflow:hidden!important}
+.content{height:100%;overflow:hidden;transform:none!important}
+.vertical-track,.horizontal-track{position:relative;transition:none}
+.horizontal{overflow:hidden!important}
+.horizontal>.row{transition:none}
+.category-scroll,.grid-scroll,.channel-scroll,.episode-scroll,.search-scroll{position:relative;height:100%;overflow-y:hidden;overflow-x:hidden;scrollbar-width:none;-ms-overflow-style:none}
+.category-scroll::-webkit-scrollbar,.grid-scroll::-webkit-scrollbar,.channel-scroll::-webkit-scrollbar,.episode-scroll::-webkit-scrollbar,.search-scroll::-webkit-scrollbar{display:none}
+.category-list,.media-grid,.channel-list,.episode-grid{display:grid;width:100%;height:auto;min-height:100%}
+.category-list{gap:14px;padding:8px 10px 80px 4px}
+.media-grid{grid-template-columns:repeat(5,minmax(0,1fr));column-gap:28px;row-gap:38px;padding:8px 14px 100px}
+.channel-list,.episode-grid{gap:12px;padding:8px 10px 70px}
+.focus-viewport,.focus-track{position:relative;height:100%;overflow:hidden}.focus-track{width:100%;min-height:100%}
+.avplay-hidden{visibility:hidden!important}

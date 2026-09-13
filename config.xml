@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="https://cinemanoir.local" version="1.0.0" viewmodes="maximized">
+  <tizen:application id="CnNoir2026.CinemaNoir" package="CnNoir2026" required_version="4.0"/>
+  <content src="index.html"/>
+  <name>Cinema Noir</name><icon src="icon.png"/>
+  <access origin="*" subdomains="true"/>
+  <tizen:profile name="tv-samsung"/>
+  <feature name="http://tizen.org/feature/screen.size.all"/>
+  <feature name="http://tizen.org/feature/tv.inputdevice"/>
+  <tizen:privilege name="http://tizen.org/privilege/internet"/>
+  <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+  <tizen:metadata key="http://samsung.com/tv/metadata/devel.api.version" value="4.0"/>
+  <tizen:setting screen-orientation="landscape" context-menu="disable" background-support="disable" encryption="disable" install-location="auto" hwkey-event="enable"/>
+</widget>

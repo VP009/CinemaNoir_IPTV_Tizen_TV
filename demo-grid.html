@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Teste offline · Cinema Noir</title><link rel="stylesheet" href="css/demo-grid.css"></head>
+<body><main id="app"><h1>Catálogo de teste offline</h1><p>Setas: navegar · OK: detalhes · Esc: voltar</p>
+<nav><button id="all">Todos (43)</button><button id="action">Ação</button><button id="drama">Drama</button></nav>
+<div id="movieViewport"><div id="movieGrid" class="media-grid"></div></div><p id="detail"></p></main>
+<script>window.Noir={focusHistory:{save:function(){},restore:function(){return false;}},back:function(){document.getElementById("detail").textContent="";},playerActive:false};</script>
+<script src="js/navigation/grid-scroller.js"></script><script src="js/navigation/focus-manager.js"></script>
+<script src="js/navigation/spatial-navigation.js"></script><script src="js/navigation/remote.js"></script><script src="js/demo-grid.js"></script></body></html>

@@ -41,6 +41,7 @@
     var index = knownIndex === undefined ? list.indexOf(el) : knownIndex;
     if (track.id === "categories") N.ensureCategoryVisible(index);
     else if (track.id === "catalog" && !track.closest(".live-layout")) N.ensureSeriesVisible(index);
+    else if (track.id === "episodes" && N.ensureEpisodeVisible) N.ensureEpisodeVisible(index);
     else if (!track._horizontal) scroller.ensureVisible(index);
     else {
       var left = index * (scroller.cardWidth + scroller.columnGap), x = Number(track.dataset.offsetX || 0), width = track.parentElement.clientWidth;

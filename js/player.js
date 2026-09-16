@@ -124,6 +124,7 @@
       if (root) {
         root.classList.add("idle");
         if (ui) ui.classList.add("hidden");
+        if (sideActions) sideActions.classList.add("hidden");
       }
     }, 3000);
   };
@@ -152,10 +153,10 @@
         nextSeasonNumber = current.options.nextSeasonNumber || nextItem.season || currentSeasonNumber,
         nextSeason = String(nextSeasonNumber) !== String(currentSeasonNumber), nextControl = document.createElement("button"), next = document.createElement("button"),
         nextLabel = (nextSeasonNumber ? "S" + nextSeasonNumber + " " : "") + (nextItem.episode_num ? "E" + nextItem.episode_num + " · " : "") + (nextItem.title || current.options.seriesName || "Próximo episódio");
-      nextControl.className = "player-control next-episode-control";
+      nextControl.className = "player-control";
       nextControl.dataset.action = "next";
       nextControl.setAttribute("aria-label", nextSeason ? "Próxima temporada" : "Próximo episódio");
-      nextControl.innerHTML = iconHtml("chevron-right") + '<small class="next-control-label">Próximo</small>';
+      nextControl.innerHTML = iconHtml("chevron-right");
       sideActions.appendChild(nextControl);
       next.className = "next-episode-prompt";
       next.dataset.action = "next";

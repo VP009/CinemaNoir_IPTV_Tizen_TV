@@ -6,7 +6,7 @@
   --focus-scale:1.04;
   --poster-height:320px;--poster-image-height:260px;--poster-gap-y:32px;
   --category-width:320px;--category-height:76px;--category-gap:14px;
-  --episode-height:80px;--episode-gap:12px;
+  --episode-height:104px;--episode-gap:16px;
   --font-xs:16px;--font-sm:18px;--font-md:22px;--font-lg:28px;--font-xl:36px;--font-xxl:48px;
   --focus-duration:90ms;--scroll-duration:140ms;
 }
@@ -28,7 +28,7 @@ html,body{width:100%;height:100%;margin:0;overflow:hidden}
 .category-list{grid-template-columns:1fr;grid-auto-rows:var(--category-height);row-gap:var(--category-gap)}
 .category-list>.category-item{height:var(--category-height);margin:0;min-height:0;padding:12px 18px;font-size:var(--font-md);gap:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .episode-grid{grid-template-columns:1fr;grid-auto-rows:var(--episode-height);row-gap:var(--episode-gap)}
-.episode-grid>.episode{height:var(--episode-height);min-height:0;margin:0;padding:14px 20px;font-size:var(--font-md);gap:18px}
+.episode-grid>.episode{height:var(--episode-height);min-height:0;margin:0;padding:18px 24px;font-size:26px;gap:22px;border-radius:14px}
 .season-scroll{height:92px;flex:0 0 92px}
 .season-list{display:flex;width:max-content;gap:16px}
 .season-list>.season-button{width:210px;height:76px;margin:0;padding:12px 18px;font-size:var(--font-md)}
@@ -315,11 +315,6 @@ header .active-profile{margin-left:auto;padding:9px 16px;border:1px solid rgba(1
   .detail-page{gap:48px!important}.detail-page .season-list{gap:20px!important}
 }
 
-/* Próximo episódio permanece visível mesmo quando os demais controles somem. */
-.next-episode-control{width:116px!important;min-width:116px!important;height:82px!important;border-radius:18px!important;flex-direction:column;gap:4px}
-.next-episode-control .ui-icon{width:36px!important;height:36px!important}
-.next-episode-control .next-control-label{margin:0!important;font-size:13px!important;line-height:1!important;color:#ddd6fe}
-
 /* Escala adicional para televisores Full HD e maiores. */
 @media(min-width:1400px){
   .home-actions.home-primary-actions{max-width:1230px}
@@ -361,4 +356,74 @@ header .active-profile{margin-left:auto;padding:9px 16px;border:1px solid rgba(1
 @keyframes title-carousel{
   0%,15%{transform:translate3d(0,0,0)}
   85%,100%{transform:translate3d(-50%,0,0)}
+}
+
+/* Detalhes v23: separação confortável entre capa, texto e ações na TV. */
+.detail-page{
+  gap:90px!important;
+  padding:22px 30px 70px!important;
+  align-items:flex-start;
+}
+.detail-page>img{
+  flex:0 0 auto;
+  margin:0;
+}
+.detail-page>section{
+  padding:8px 24px 0 0;
+}
+.detail-page .eyebrow{
+  margin:0 0 14px;
+}
+.detail-page h1{
+  margin:0 0 24px;
+  line-height:1.12;
+}
+.detail-page>section>p{
+  margin:0 0 30px;
+  line-height:1.65;
+}
+.detail-page>section>.meta{
+  margin-top:4px;
+  margin-bottom:32px;
+}
+.detail-page>section>.row,
+.detail-page #series-actions{
+  gap:22px;
+  margin:28px 0 36px;
+}
+.detail-page>section>.row button,
+.detail-page #series-actions button{
+  min-height:68px;
+  padding:16px 28px;
+}
+.detail-page .season-scroll{
+  margin:28px 0 32px;
+}
+@media(max-width:1399px){
+  .detail-page{gap:58px!important;padding:16px 20px 50px!important}
+  .detail-page>section{padding-right:12px}
+  .detail-page h1{margin-bottom:18px}
+  .detail-page>section>p{margin-bottom:22px;line-height:1.5}
+  .detail-page>section>.row,.detail-page #series-actions{margin:20px 0 26px}
+  .detail-page .season-scroll{margin:20px 0 25px}
+}
+
+/* A lista de episódios recebe mais altura e cartões maiores. */
+.series-detail-page>section>p{
+  display:-webkit-box;
+  overflow:hidden;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:3;
+  max-height:118px;
+}
+.series-detail-page #series-actions{margin:18px 0 24px}
+.series-detail-page .season-scroll{margin:18px 0 24px}
+.series-detail-page .episode-scroll{flex:1 1 0;height:0;min-height:330px;overflow:hidden!important}
+.series-detail-page .episode-grid{height:auto!important;min-height:100%;will-change:transform}
+.series-detail-page .episode-grid>.episode b{margin-right:10px;font-size:28px;color:#c4b5fd}
+.series-detail-page .episode-grid>.episode>span:last-of-type{font-size:21px;color:#aaa1b9}
+@media(max-width:1399px){
+  .series-detail-page>section>p{-webkit-line-clamp:2;max-height:78px}
+  .series-detail-page .episode-scroll{height:0;min-height:235px}
+  .series-detail-page .episode-grid>.episode{padding:15px 20px;font-size:22px}
 }

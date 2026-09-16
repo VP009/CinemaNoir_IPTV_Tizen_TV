@@ -490,7 +490,7 @@
           root = document.getElementById("details");
         root.className = "";
         root.innerHTML =
-          '<div class="detail detail-page"><img src="' +
+          '<div class="detail detail-page series-detail-page"><img src="' +
           esc(
             (info.info && info.info.cover) ||
               item.cover ||
@@ -551,6 +551,9 @@
         function renderEpisodes() {
           var list = seasons[selected] || [],
             out = document.getElementById("episodes");
+          out.dataset.offsetY = "0";
+          out.style.transform = "translate3d(0px,0px,0px)";
+          out._scroller = null;
           out.innerHTML =
             list
               .map(function (ep, n) {

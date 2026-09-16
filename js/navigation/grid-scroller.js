@@ -2,7 +2,7 @@
   "use strict";
   var SERIES_ROW_HEIGHT = 352;
   var CATEGORY_ROW_HEIGHT = 90;
-  var EPISODE_ROW_HEIGHT = 92;
+  var EPISODE_ROW_HEIGHT = 120;
 
   function numberAttribute(element, name) {
     return parseInt(element && element.getAttribute(name), 10) || 0;
@@ -28,6 +28,17 @@
   function setCategoryY(y) {
     var viewport = document.querySelector(".category-scroll");
     var list = document.getElementById("categories");
+    if (!viewport || !list) return 0;
+    y = clampTrackY(viewport, list, y);
+    list.setAttribute("data-offset-y", String(y));
+    list.style.transform = "translate3d(0px," + (-y) + "px,0px)";
+    if (list._scroller) list._scroller.currentY = y;
+    return y;
+  }
+
+  function setEpisodeY(y) {
+    var viewport = document.querySelector(".episode-scroll");
+    var list = document.getElementById("episodes");
     if (!viewport || !list) return 0;
     y = clampTrackY(viewport, list, y);
     list.setAttribute("data-offset-y", String(y));
@@ -72,13 +83,32 @@
     return setCategoryY(newY);
   }
 
+  function ensureEpisodeVisible(index) {
+    var viewport = document.querySelector(".episode-scroll");
+    var list = document.getElementById("episodes");
+    if (!viewport || !list || index < 0) return 0;
+    var itemTop = index * EPISODE_ROW_HEIGHT;
+    var itemBottom = itemTop + 104;
+    var currentY = numberAttribute(list, "data-offset-y");
+    var safeMargin = 28;
+    var newY = currentY;
+    if (itemBottom > currentY + viewport.clientHeight - safeMargin) {
+      newY = itemBottom - viewport.clientHeight + safeMargin;
+    } else if (itemTop < currentY + safeMargin) {
+      newY = itemTop - safeMargin;
+    }
+    return setEpisodeY(newY);
+  }
+
   N.SERIES_ROW_HEIGHT = window.SERIES_ROW_HEIGHT = SERIES_ROW_HEIGHT;
   N.CATEGORY_ROW_HEIGHT = window.CATEGORY_ROW_HEIGHT = CATEGORY_ROW_HEIGHT;
   N.EPISODE_ROW_HEIGHT = window.EPISODE_ROW_HEIGHT = EPISODE_ROW_HEIGHT;
   N.setSeriesY = window.setSeriesY = setSeriesY;
   N.setCategoryY = window.setCategoryY = setCategoryY;
+  N.setEpisodeY = window.setEpisodeY = setEpisodeY;
   N.ensureSeriesVisible = window.ensureSeriesVisible = ensureSeriesVisible;
   N.ensureCategoryVisible = window.ensureCategoryVisible = ensureCategoryVisible;
+  N.ensureEpisodeVisible = window.ensureEpisodeVisible = ensureEpisodeVisible;
   N.TV_METRICS = { seriesRowHeight: SERIES_ROW_HEIGHT, categoryRowHeight: CATEGORY_ROW_HEIGHT, episodeRowHeight: EPISODE_ROW_HEIGHT };
   N.debugTvLayout = window.debugTvLayout = function () {
     var selectors = [".catalog-layout", ".category-scroll", "#categories", ".grid-scroll", "#catalog", ".poster", ".episode-scroll", "#episodes"], result = {

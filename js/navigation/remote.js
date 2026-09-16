@@ -33,10 +33,12 @@
       N.openKeyboard(input);
     }
   }
-  function resetSeekHold() {
+  function resetSeekHold(commit) {
     if (seekHold && seekHold.timer) {
       clearInterval(seekHold.timer);
     }
+    if (seekHold && commit && N.playerScrubCommit) N.playerScrubCommit();
+    else if (seekHold && N.playerScrubCancel) N.playerScrubCancel();
     seekHold = null;
   }
   function markNavigationSpeed() {
@@ -94,17 +96,22 @@
       ) {
         var direction = code === 37 ? -1 : 1;
         if (seekHold && seekHold.direction !== direction) {
-          resetSeekHold();
+          resetSeekHold(true);
         }
         if (!seekHold) {
           seekHold = { direction: direction, count: 0, timer: null };
-          function tickSeek() {
+          if (N.playerScrubStart && N.playerScrubStart(direction)) {
+            function tickSeek() {
+              if (!seekHold) return;
+              seekHold.count += 1;
+              var step = seekHold.count < 8 ? 2 : seekHold.count < 20 ? 5 : 10;
+              N.playerScrubBy(direction * step);
+            }
+            seekHold.timer = setInterval(tickSeek, 80);
+          } else {
             seekHold.count += 1;
-            var step = Math.min(180, 10 + seekHold.count * 12);
-            N.playerSeek(direction * step);
+            N.playerSeek(direction * 10);
           }
-          tickSeek();
-          seekHold.timer = setInterval(tickSeek, 180);
         }
         return;
       }
@@ -126,8 +133,9 @@
       }, 800);
   });
   document.addEventListener("keyup", function (e) {
-    if (e.keyCode === 37 || e.keyCode === 39) {
-      resetSeekHold();
+    var code = e.keyCode || ({ArrowLeft:37, ArrowRight:39})[e.key];
+    if (code === 37 || code === 39) {
+      resetSeekHold(true);
       return;
     }
     if (e.keyCode !== 13 || !pressed) return;

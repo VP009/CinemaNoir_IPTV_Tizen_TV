@@ -11,7 +11,7 @@
     } catch (e) { N.toast("Não foi possível salvar o progresso."); return null; }
   }
   function ratio(record) { return record && record.duration > 0 ? record.position / record.duration : 0; }
-  function complete(record) { return !!record && (ratio(record) >= 0.92 || (record.duration > 120 && record.duration - record.position <= 120)); }
+  function complete(record) { return !!record && (ratio(record) >= 0.98 || (record.duration > 30 && record.duration - record.position <= 30)); }
   function resumable(record) { return !!record && !record.completed && !complete(record) && (record.pending || ratio(record) >= 0.02); }
   function records(profile, type) {
     var prefix = "noir:" + profileId(profile) + ":progress:" + type + ":", out = [];

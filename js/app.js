@@ -19,26 +19,13 @@
     return s.normalize ? s.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : s;
   }
   function header() {
-    var expiry = "Sem data de expiração";
-    if (N.active && N.active.account && N.active.account.exp_date) {
-      var date = new Date(Number(N.active.account.exp_date) * 1000);
-      expiry = isNaN(date.getTime())
-        ? "Expiração não informada"
-        : "Expira em " + date.toLocaleDateString("pt-BR");
-    }
-    return (
-      '<header><div class="brand"><b>CINEMA</b> NOIR</div><span class="active-profile">' +
-      esc(N.active ? N.active.name : "") +
-      '</span><span id="clock"></span><button data-route="settings">' + icon("settings") + ' Configurações</button></header><div class="footer">' +
-      esc(expiry) +
-      '</div><div class="footer hint">OK: abrir · segure OK: favorito · Voltar: retornar</div>'
-    );
+    return '<header class="home-status-bar"><span id="clock"></span></header>';
   }
-  function page(body, showHeader) {
+  function page(body, showHeader, viewportClass) {
     getApp().innerHTML =
       (showHeader ? header() : "") +
       '<div class="viewport ' +
-      (showHeader ? "" : "full-viewport") +
+      (showHeader ? "" : "full-viewport") + " " + (viewportClass || "") +
       '"><div class="content">' +
       body +
       "</div></div>";
@@ -53,12 +40,16 @@
     clock();
   }
   function clock() {
+    clearInterval(N.clockTimer);
     var e = document.getElementById("clock");
-    if (e)
-      e.textContent = new Date().toLocaleTimeString("pt-BR", {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+    if (!e) return;
+    function pad(value) { return value < 10 ? "0" + value : String(value); }
+    function updateClock() {
+      var now = new Date();
+      e.textContent = pad(now.getDate()) + "/" + pad(now.getMonth() + 1) + "/" + String(now.getFullYear()).slice(-2) + "  " + pad(now.getHours()) + ":" + pad(now.getMinutes());
+    }
+    updateClock();
+    N.clockTimer = setInterval(updateClock, 30000);
   }
   function go(route) {
     N.focusHistory.pushRoute();
@@ -124,13 +115,13 @@
   }
   function saveProfile(old) {
     var name = document.getElementById("name").value.trim(),
-      base = document.getElementById("url").value.trim().replace(/\/+$/, ""),
+      base = "http://" + document.getElementById("url").value.trim().replace(/^https?:\/\//i, "").replace(/\/+$/, ""),
       user = document.getElementById("username").value.trim(),
       pass = document.getElementById("password").value;
     if (!name || !base || !user || !pass)
       return showError("Preencha todos os campos.");
-    if (!/^https?:\/\//i.test(base))
-      return showError("A URL deve começar com http:// ou https://.");
+    if (!/^http:\/\/[^/\s]+/i.test(base))
+      return showError("Informe o endereço correto do servidor.");
     var now = new Date().toISOString(),
       p = {
         id: old ? old.id : "p" + Date.now(),
@@ -163,10 +154,11 @@
   }
   function home() {
     page(
-      '<div class="eyebrow">Sua central de entretenimento</div><h1>' +
+      '<div class="home-page"><div class="home-intro"><div class="eyebrow">Sua central de entretenimento</div><h1>O que você quer assistir?</h1><p>' +
         esc(N.active.name) +
-        '</h1><div class="row"><button id="home-live" class="home-card" data-route="live">'+icon("tv")+'<strong>TV ao vivo</strong><small data-count="live">Carregando…</small></button><button id="home-movies" class="home-card" data-route="movies">'+icon("film")+'<strong>Filmes</strong><small data-count="movies">Carregando…</small></button><button id="home-series" class="home-card" data-route="series">'+icon("clapperboard")+'<strong>Séries</strong><small data-count="series">Carregando…</small></button></div><div class="row"><button class="home-card secondary" data-route="continue">'+icon("clock")+'<strong>Continuar</strong></button><button class="home-card secondary" data-route="search">'+icon("search")+'<strong>Pesquisar</strong></button><button class="home-card secondary" data-route="settings">'+icon("settings")+'<strong>Configurações</strong></button></div>',
+        '</p></div><div class="home-actions home-primary-actions" style="display:-webkit-flex;display:flex;-webkit-flex-direction:row;flex-direction:row;-webkit-flex-wrap:nowrap;flex-wrap:nowrap"><button id="home-live" class="home-card home-action-card" data-route="live" data-nav-left="home-live" data-nav-right="home-movies" data-nav-up="home-live" data-nav-down="home-continue">'+icon("tv")+'<span><strong>TV ao vivo</strong><small data-count="live">Carregando…</small></span></button><button id="home-movies" class="home-card home-action-card" data-route="movies" data-nav-left="home-live" data-nav-right="home-series" data-nav-up="home-movies" data-nav-down="home-search">'+icon("film")+'<span><strong>Filmes</strong><small data-count="movies">Carregando…</small></span></button><button id="home-series" class="home-card home-action-card" data-route="series" data-nav-left="home-movies" data-nav-right="home-series" data-nav-up="home-series" data-nav-down="home-settings">'+icon("clapperboard")+'<span><strong>Séries</strong><small data-count="series">Carregando…</small></span></button></div><div class="home-actions home-secondary-actions" style="display:-webkit-flex;display:flex;-webkit-flex-direction:row;flex-direction:row;-webkit-flex-wrap:nowrap;flex-wrap:nowrap"><button id="home-continue" class="home-card home-action-card home-compact-card" data-route="continue" data-nav-up="home-live" data-nav-left="home-continue" data-nav-right="home-search" data-nav-down="home-continue">'+icon("clock")+'<span><strong>Continuar</strong></span></button><button id="home-search" class="home-card home-action-card home-compact-card" data-route="search" data-nav-up="home-movies" data-nav-left="home-continue" data-nav-right="home-settings" data-nav-down="home-search">'+icon("search")+'<span><strong>Pesquisar</strong></span></button><button id="home-settings" class="home-card home-action-card home-compact-card" data-route="settings" data-nav-up="home-series" data-nav-left="home-search" data-nav-right="home-settings" data-nav-down="home-settings">'+icon("settings")+'<span><strong>Configurações</strong></span></button></div></div>',
       true,
+      "home-viewport",
     );
     ["live", "movies", "series"].forEach(function (k) {
       N.catalog(k)
@@ -189,6 +181,8 @@
         '</h1><input id="filter" data-focusable="true" data-nav-down="CATEGORY_ALL" placeholder="Pesquisar em ' +
         names[kind].toLowerCase() +
         '"></div><div class="catalog-layout ' + (kind === "live" ? "live-layout" : "") + '"><aside class="category-scroll"><div id="categories" class="category-list" data-region="categories"><div class="skeleton"></div></div></aside><section class="grid-scroll"><div id="catalog" class="media-grid" data-region="' + (kind === "live" ? "channels" : kind + "-grid") + '"><div class="skeleton-grid"><i class="skeleton"></i><i class="skeleton"></i><i class="skeleton"></i><i class="skeleton"></i></div></div></section>' + (kind === "live" ? '<aside id="live-preview" class="live-preview">' + icon("tv") + '<h2>Selecione um canal</h2><p>O canal escolhido será reproduzido em tela cheia.</p></aside>' : '') + '</div></div>',
+      false,
+      "catalog-viewport",
     );
     Promise.all([N.catalog(kind), N.categories(kind)])
       .then(function (results) {
@@ -314,6 +308,8 @@
       filtered
         .map(function (i, n) {
           var saved = savedProgress(kind, i),
+            titleText = String(i.name || i.title || "Sem título") + (kind === "series" && saved ? " · S" + (saved.seasonNumber || saved.item && saved.item.season || "") + ":E" + (saved.episodeNumber || saved.item && saved.item.episode_num || "") : ""),
+            titleHtml = esc(titleText),
             percent =
               saved && saved.duration
                 ? Math.min(
@@ -327,16 +323,16 @@
             N.contentId(i) +
             '"><img loading="lazy" src="' +
             esc(i.stream_icon || i.cover || "assets/fallback.svg") +
-            '" onerror="this.onerror=null;this.src=\'assets/fallback.svg\'"><span class="label"><span>' +
-            esc(i.name || i.title) + (kind === "series" && saved ? " · S" + esc(saved.seasonNumber || saved.item && saved.item.season || "") + ":E" + esc(saved.episodeNumber || saved.item && saved.item.episode_num || "") : "") +
-            "</span></span>" +
+            '" onerror="this.onerror=null;this.src=\'assets/fallback.svg\'"><span class="label"><span class="title-marquee"><span class="title-copy">' +
+            titleHtml +
+            '</span><span class="title-copy title-copy-clone" aria-hidden="true">' + titleHtml + "</span></span></span>" +
             (percent
               ? '<span class="card-progress"><i style="width:' +
                 percent +
                 '%"></i></span>'
               : "") +
             (N.isFavorite(kind, i)
-              ? '<span class="star">' + icon("star") + "</span>"
+            ? '<span class="star" aria-label="Favorito">' + icon("star") + "</span>"
               : "") +
             "</button>"
           );
@@ -352,6 +348,11 @@
       };
       b.onfocus = function () {
         root.dataset.lastIndex = this.dataset.index;
+        var label = this.querySelector(".label"), marquee = this.querySelector(".title-marquee"), copy = this.querySelector(".title-copy");
+        if (label && marquee && copy) {
+          if (copy.scrollWidth - 42 > label.clientWidth) marquee.classList.add("is-overflowing");
+          else marquee.classList.remove("is-overflowing");
+        }
         if (kind === "live") {
           N.focusHistory.patch(kind, { focusedChannelId: N.contentId(item), channelIndex: Number(this.dataset.index) });
           var preview = document.getElementById("live-preview");
@@ -483,7 +484,7 @@
     N.request(N.active, "get_series_info", { series_id: N.contentId(item) })
       .then(function (info) {
         var seasons = info.episodes || {},
-          keys = Object.keys(seasons),
+          keys = Object.keys(seasons).sort(function (a, b) { return Number(a) - Number(b); }),
           latest = latestSeriesProgress(item),
           selected = keys[0] || "1",
           root = document.getElementById("details");
@@ -583,30 +584,38 @@
               listForSeason = seasons[String(seasonKey)] || [],
               episodeIndex = listForSeason.indexOf(episode),
               prev = episodeIndex > 0 ? listForSeason[episodeIndex - 1] : null,
-              next = episodeIndex >= 0 && episodeIndex < listForSeason.length - 1 ? listForSeason[episodeIndex + 1] : null;
+              next = episodeIndex >= 0 && episodeIndex < listForSeason.length - 1 ? listForSeason[episodeIndex + 1] : null,
+              prevSeasonKey = String(seasonKey), nextSeasonKey = String(seasonKey);
             if (!prev && seasonIndex > 0) {
-              var prevSeason = keys[seasonIndex - 1],
-                prevList = seasons[prevSeason] || [];
-              if (prevList.length) prev = prevList[prevList.length - 1];
+              for (var previousIndex = seasonIndex - 1; previousIndex >= 0 && !prev; previousIndex -= 1) {
+                var prevSeason = keys[previousIndex], prevList = seasons[prevSeason] || [];
+                if (prevList.length) { prev = prevList[prevList.length - 1]; prevSeasonKey = String(prevSeason); }
+              }
             }
             if (!next && seasonIndex < keys.length - 1) {
-              var nextSeason = keys[seasonIndex + 1];
-              if (nextSeason && seasons[nextSeason] && seasons[nextSeason][0])
-                next = seasons[nextSeason][0];
+              for (var nextIndex = seasonIndex + 1; nextIndex < keys.length && !next; nextIndex += 1) {
+                var nextSeason = keys[nextIndex];
+                if (nextSeason && seasons[nextSeason] && seasons[nextSeason][0]) {
+                  next = seasons[nextSeason][0];
+                  nextSeasonKey = String(nextSeason);
+                }
+              }
             }
             return {
               seriesId: N.contentId(item),
               seriesName: item.name,
               seriesPoster: item.cover,
+              seasonNumber: String(seasonKey),
               prevItem: prev,
               nextItem: next,
+              nextSeasonNumber: next ? next.season || nextSeasonKey : null,
               prev: prev
                 ? function () {
                     N.openPlayer(
                       "episode",
                       prev,
                       prev.title || item.name,
-                      buildEpisodeOptions(prev, prev.season || String(seasonKey)),
+                      buildEpisodeOptions(prev, prev.season || prevSeasonKey),
                     );
                   }
                 : null,
@@ -616,7 +625,7 @@
                       "episode",
                       next,
                       next.title || item.name,
-                      buildEpisodeOptions(next, next.season || String(seasonKey)),
+                      buildEpisodeOptions(next, next.season || nextSeasonKey),
                     );
                   }
                 : null,

@@ -11,7 +11,8 @@
   N.request = function (profile, action, params) {
     return new Promise(function (resolve, reject) {
       var xhr = new XMLHttpRequest(), generation = N.generation;
-      var url = profile.baseUrl + '/player_api.php?username=' + encodeURIComponent(profile.username) + '&password=' + encodeURIComponent(profile.password);
+    var serverBase = 'http://' + String(profile.baseUrl || '').replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+    var url = serverBase + '/player_api.php?username=' + encodeURIComponent(profile.username) + '&password=' + encodeURIComponent(profile.password);
       if (action) url += '&action=' + encodeURIComponent(action);
       Object.keys(params || {}).forEach(function (key) { url += '&' + encodeURIComponent(key) + '=' + encodeURIComponent(params[key]); });
       N.requests.push(xhr); xhr.open('GET', url, true); xhr.timeout = 15000;
@@ -27,5 +28,5 @@
   N.contentId = function (item) { return String(item.stream_id || item.series_id || item.id); };
   N.favorite = function (kind, item) { var key = N.key('favorites'), items = N.read(key, {}), id = kind + ':' + N.contentId(item); if (items[id]) delete items[id]; else items[id] = {kind:kind,item:item}; N.write(key, items); return !!items[id]; };
   N.isFavorite = function (kind, item) { return !!N.read(N.key('favorites'), {})[kind + ':' + N.contentId(item)]; };
-  N.streamUrl = function (kind, item) { var p = N.active; var ext = kind === 'live' ? 'm3u8' : String(item.container_extension || 'mp4').replace(/[^a-z0-9]/gi, ''); return p.baseUrl + '/' + ({live:'live',movies:'movie',episode:'series'}[kind]) + '/' + encodeURIComponent(p.username) + '/' + encodeURIComponent(p.password) + '/' + encodeURIComponent(N.contentId(item)) + '.' + ext; };
+  N.streamUrl = function (kind, item) { var p = N.active, base = 'http://' + String(p.baseUrl || '').replace(/^https?:\/\//i, '').replace(/\/+$/, ''); var ext = kind === 'live' ? 'm3u8' : String(item.container_extension || 'mp4').replace(/[^a-z0-9]/gi, ''); return base + '/' + ({live:'live',movies:'movie',episode:'series'}[kind]) + '/' + encodeURIComponent(p.username) + '/' + encodeURIComponent(p.password) + '/' + encodeURIComponent(N.contentId(item)) + '.' + ext; };
 }(Noir));

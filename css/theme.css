@@ -315,7 +315,7 @@ select[data-focused="true"] {
 }
 .poster:focus .label > span,
 .poster[data-focused="true"] .label > span {
-  transform: none !important;
+  will-change: transform;
 }
 .card-progress {
   position: absolute;

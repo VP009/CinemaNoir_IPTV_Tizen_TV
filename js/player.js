@@ -1,11 +1,12 @@
 (function (N) {
   "use strict";
-  var root, video, av, hideTimer, saveTimer, current, activePlaybackEngine = null, playbackGeneration = 0;
+  var root, video, av, hideTimer, saveTimer, current, activePlaybackEngine = null, playbackGeneration = 0,
+    scrub = { active: false, target: 0, duration: 0, origin: 0 };
   function progressKey() {
     return N.key("progress", current.kind + ":" + N.contentId(current.item));
   }
-  function save() {
-    if (!current) return;
+  function save(force) {
+    if (!current || current.kind === "live") return null;
     var position = 0,
       duration = 0;
     try {
@@ -19,7 +20,7 @@
     } catch (e) {
       console.log("PLAYER PROGRESS ERROR", e);
     }
-    if (position <= 5) return;
+    if (position <= 0 || (!force && position <= 5)) return null;
       var record = {
         profileId: N.active.id,
         position: position,
@@ -34,12 +35,14 @@
         seriesPoster: current.options.seriesPoster || current.item.cover || current.item.stream_icon || null,
         episodeId:
           current.kind === "episode" ? N.contentId(current.item) : null,
-        seasonNumber: current.item.season || null,
+        seasonNumber: current.options.seasonNumber || current.item.season || null,
         episodeNumber: current.item.episode_num || null,
+        pending: !duration,
         updatedAt: Date.now()
       };
-    if (current.kind === "episode") N.WatchProgressStore.saveEpisodeProgress(record);
-    else if (current.kind === "movies") N.WatchProgressStore.saveMovieProgress(record);
+    if (current.kind === "episode") return N.WatchProgressStore.saveEpisodeProgress(record);
+    if (current.kind === "movies") return N.WatchProgressStore.saveMovieProgress(record);
+    return null;
   }
   function status(message) {
     var el = root && root.querySelector(".player-status");
@@ -48,26 +51,48 @@
       el.hidden = !message;
     }
   }
-  function setProgress() {
-    if (!root) return;
-    var position = 0,
-      duration = 0;
+  function playbackTime() {
+    var position = 0, duration = 0;
     try {
       if (av) {
         position = av.getCurrentTime();
         duration = av.getDuration();
-      } else {
-        position = video.currentTime * 1000;
-        duration = video.duration * 1000;
+      } else if (video) {
+        position = (video.currentTime || 0) * 1000;
+        duration = (video.duration || 0) * 1000;
       }
     } catch (e) {
       console.log("PLAYER TIME ERROR", e);
     }
-    var bar = root.querySelector(".progress i");
-    bar.style.width =
-      (duration ? Math.min(100, (position / duration) * 100) : 0) + "%";
-    root.querySelector(".time").textContent =
-      format(position / 1000) + " / " + format(duration / 1000);
+    return { position: position, duration: duration };
+  }
+  function renderTimeline(position, duration, preview) {
+    if (!root) return;
+    var bar = root.querySelector(".progress i"), time = root.querySelector(".time"), hint = root.querySelector(".seek-hint");
+    if (bar) bar.style.width = (duration ? Math.max(0, Math.min(100, (position / duration) * 100)) : 0) + "%";
+    if (time) time.textContent = format(position / 1000) + " / " + format(duration / 1000);
+    if (hint) { hint.hidden = !preview; hint.textContent = preview ? "Solte para ir até " + format(position / 1000) : ""; }
+    root.classList.toggle("scrubbing", !!preview);
+  }
+  function updateNextEpisode(position, duration) {
+    var prompt = root && root.querySelector(".next-episode-prompt");
+    if (!prompt || !current || current.kind !== "episode" || !current.options.next || !duration) return;
+    var remaining = Math.max(0, duration - position), show = remaining <= 40000;
+    if (!show && N.getFocused && N.getFocused() === prompt) {
+      var permanentNext = root.querySelector('.player-side-actions [data-action="next"]');
+      if (permanentNext) N.focus(permanentNext);
+    }
+    prompt.hidden = !show;
+    prompt.classList.toggle("visible", show);
+    var countdown = prompt.querySelector(".next-countdown");
+    if (countdown) countdown.textContent = "Termina em " + Math.ceil(remaining / 1000) + "s";
+  }
+  function setProgress() {
+    if (!root) return;
+    var time = playbackTime();
+    updateNextEpisode(time.position, time.duration);
+    if (scrub.active) renderTimeline(scrub.target, scrub.duration, true);
+    else renderTimeline(time.position, time.duration, false);
   }
   function format(seconds) {
     if (!isFinite(seconds)) return "--:--";
@@ -90,17 +115,20 @@
     root.classList.remove("idle");
     if (ui) ui.classList.remove("hidden");
     if (sideActions) sideActions.classList.remove("hidden");
+    var focused = N.getFocused && N.getFocused();
+    if ((!focused || (root.contains && !root.contains(focused))) && N.focus) {
+      N.focus(root.querySelector('[data-action="timeline"]') || root.querySelector("button"));
+    }
     clearTimeout(hideTimer);
     hideTimer = setTimeout(function () {
       if (root) {
         root.classList.add("idle");
         if (ui) ui.classList.add("hidden");
-        if (sideActions) sideActions.classList.add("hidden");
       }
     }, 3000);
   };
   N.openPlayer = function (kind, item, title, options) {
-    if (root) N.closePlayer();
+    if (root) N.closePlayer(true);
     playbackGeneration++;
     if (N.focusHistory) N.focusHistory.capture();
     current = { kind: kind, item: item, title: title, options: options || {} };
@@ -108,7 +136,7 @@
     root = document.createElement("div");
     root.className = "player player-page";
     root.innerHTML =
-      '<video id="video-player" class="video-player" playsinline></video><div class="player-status">Preparando reprodução...</div><div class="player-ui"><h2></h2><button class="player-progress-wrapper" aria-label="Linha do tempo" data-action="timeline"><span class="progress"><i></i></span><span class="time">0:00</span></button><div class="row player-controls"><button class="player-control" aria-label="Voltar" data-action="close">' + iconHtml("arrow-left") + '</button><button class="player-control" aria-label="Voltar 30 segundos" data-action="backward">' + iconHtml("skip-back") + '<small>30</small></button><button class="player-control" aria-label="Pausar ou reproduzir" data-action="toggle">' + iconHtml("pause") + '</button><button class="player-control" aria-label="Avançar 30 segundos" data-action="forward">' + iconHtml("skip-forward") + '<small>30</small></button></div></div><div class="player-side-actions"></div>';
+      '<video id="video-player" class="video-player" playsinline></video><div class="player-status">Preparando reprodução...</div><div class="player-ui"><h2></h2><button class="player-progress-wrapper" aria-label="Linha do tempo" data-action="timeline"><span class="progress"><i></i></span><span class="time">0:00</span><span class="seek-hint" hidden></span></button><div class="row player-controls"><button class="player-control" aria-label="Voltar" data-action="close">' + iconHtml("arrow-left") + '</button><button class="player-control" aria-label="Voltar 30 segundos" data-action="backward">' + iconHtml("skip-back") + '<small>30</small></button><button class="player-control" aria-label="Pausar ou reproduzir" data-action="toggle">' + iconHtml("pause") + '</button><button class="player-control" aria-label="Avançar 30 segundos" data-action="forward">' + iconHtml("skip-forward") + '<small>30</small></button></div></div><div class="player-side-actions"></div>';
     document.body.appendChild(root);
     var sideActions = root.querySelector(".player-side-actions");
     if (current.options.prev) {
@@ -119,13 +147,23 @@
       prev.innerHTML = iconHtml("chevron-left");
       sideActions.appendChild(prev);
     }
-    if (current.options.next) {
-      var next = document.createElement("button");
-      next.className = "player-control";
+    if (current.kind === "episode" && current.options.next) {
+      var nextItem = current.options.nextItem || {}, currentSeasonNumber = current.options.seasonNumber || current.item.season || "",
+        nextSeasonNumber = current.options.nextSeasonNumber || nextItem.season || currentSeasonNumber,
+        nextSeason = String(nextSeasonNumber) !== String(currentSeasonNumber), nextControl = document.createElement("button"), next = document.createElement("button"),
+        nextLabel = (nextSeasonNumber ? "S" + nextSeasonNumber + " " : "") + (nextItem.episode_num ? "E" + nextItem.episode_num + " · " : "") + (nextItem.title || current.options.seriesName || "Próximo episódio");
+      nextControl.className = "player-control next-episode-control";
+      nextControl.dataset.action = "next";
+      nextControl.setAttribute("aria-label", nextSeason ? "Próxima temporada" : "Próximo episódio");
+      nextControl.innerHTML = iconHtml("chevron-right") + '<small class="next-control-label">Próximo</small>';
+      sideActions.appendChild(nextControl);
+      next.className = "next-episode-prompt";
       next.dataset.action = "next";
-      next.setAttribute("aria-label", "Próximo episódio");
-      next.innerHTML = iconHtml("list-end");
-      sideActions.appendChild(next);
+      next.hidden = true;
+      next.setAttribute("aria-label", nextSeason ? "Ir para a próxima temporada" : "Ir para o próximo episódio");
+      next.innerHTML = iconHtml("list-end") + '<span><small class="next-kind">' + (nextSeason ? "Próxima temporada" : "Próximo episódio") + '</small><strong class="next-title"></strong><small class="next-countdown"></small></span>';
+      next.querySelector(".next-title").textContent = nextLabel;
+      root.appendChild(next);
     }
     root.querySelector("h2").textContent = title;
     video = root.querySelector("video");
@@ -142,6 +180,7 @@
       video.style.display = "none";
     }
     var url = N.streamUrl(kind, item), saved = kind === "episode" ? N.WatchProgressStore.getEpisodeProgress(N.contentId(item)) : kind === "movies" ? N.WatchProgressStore.getMovieProgress(N.contentId(item)) : null;
+    scrub = { active: false, target: 0, duration: 0, origin: 0 };
     root.querySelectorAll("button").forEach(function (b) {
       b.onclick = function () {
         var a = b.dataset.action;
@@ -151,11 +190,11 @@
         else if (a === "forward") seek(30);
         else if (a === "prev") {
           var prev = current.options.prev;
-          N.closePlayer();
+          N.closePlayer(true);
           if (prev) setTimeout(prev, 0);
         } else if (a === "next") {
           var next = current.options.next;
-          N.closePlayer();
+          N.closePlayer(true);
           if (next) setTimeout(next, 0);
         }
         N.playerActivity();
@@ -167,8 +206,9 @@
     else native(url, saved);
     saveTimer = setInterval(save, 10000);
     N.playerActivity();
+    N.focus(root.querySelector('[data-action="timeline"]') || root.querySelector("button"));
     setTimeout(function () {
-      if (root) N.focus(root.querySelector("button"));
+      if (root) N.focus(root.querySelector('[data-action="timeline"]') || root.querySelector("button"));
     }, 50);
   };
   function stopCurrentPlayback() {
@@ -219,13 +259,13 @@
     } catch (error) { failed(error); }
   }
   function completed() {
-    save();
+    save(true);
     var finished = current, next = finished && finished.options && finished.options.next;
     if (finished && finished.kind === "episode") {
       N.WatchProgressStore.completeEpisode(N.contentId(finished.item));
-      if (finished.options.nextItem) N.WatchProgressStore.queueNextEpisode({ profileId: N.active.id, seriesId: finished.options.seriesId, seriesName: finished.options.seriesName, seriesPoster: finished.options.seriesPoster, seasonNumber: finished.options.nextItem.season, episodeNumber: finished.options.nextItem.episode_num, episodeId: N.contentId(finished.options.nextItem), item: finished.options.nextItem, title: finished.options.nextItem.title || finished.options.seriesName });
+      if (finished.options.nextItem) N.WatchProgressStore.queueNextEpisode({ profileId: N.active.id, seriesId: finished.options.seriesId, seriesName: finished.options.seriesName, seriesPoster: finished.options.seriesPoster, seasonNumber: finished.options.nextSeasonNumber || finished.options.nextItem.season, episodeNumber: finished.options.nextItem.episode_num, episodeId: N.contentId(finished.options.nextItem), item: finished.options.nextItem, title: finished.options.nextItem.title || finished.options.seriesName });
     } else if (finished && finished.kind === "movies") N.WatchProgressStore.completeMovie(N.contentId(finished.item));
-    N.closePlayer();
+    N.closePlayer(true);
     if (next) setTimeout(next, 0);
   }
   function native(url, saved) {
@@ -280,6 +320,49 @@
     }
   }
   N.playerSeek = seek;
+  N.playerScrubStart = function (direction) {
+    var time = playbackTime();
+    if (!root || current && current.kind === "live" || !time.duration) return false;
+    scrub.active = true;
+    scrub.origin = time.position;
+    scrub.duration = time.duration;
+    scrub.target = Math.max(0, Math.min(time.duration - 1000, time.position + direction * 10000));
+    renderTimeline(scrub.target, scrub.duration, true);
+    N.playerActivity();
+    return true;
+  };
+  N.playerScrubBy = function (seconds) {
+    if (!scrub.active) return false;
+    scrub.target = Math.max(0, Math.min(scrub.duration - 1000, scrub.target + seconds * 1000));
+    renderTimeline(scrub.target, scrub.duration, true);
+    return true;
+  };
+  N.playerScrubCommit = function () {
+    if (!scrub.active) return false;
+    var target = scrub.target, origin = scrub.origin;
+    scrub.active = false;
+    try {
+      if (av && typeof av.seekTo === "function") av.seekTo(Math.floor(target), save, function () { N.toast("Não foi possível ir para esta posição."); });
+      else if (av) {
+        var delta = target - origin;
+        if (delta > 0) av.jumpForward(delta);
+        else if (delta < 0) av.jumpBackward(-delta);
+      } else if (video) { video.currentTime = target / 1000; save(); }
+      renderTimeline(target, scrub.duration, false);
+      return true;
+    } catch (e) {
+      renderTimeline(origin, scrub.duration, false);
+      N.toast("Esta transmissão não permite avançar ou voltar.");
+      return false;
+    }
+  };
+  N.playerScrubCancel = function () {
+    if (!scrub.active) return false;
+    var origin = scrub.origin, duration = scrub.duration;
+    scrub.active = false;
+    renderTimeline(origin, duration, false);
+    return true;
+  };
   function volume(delta) {
     try {
       if (typeof tizen !== "undefined" && tizen.tvaudiocontrol) {
@@ -293,11 +376,13 @@
       status("Não foi possível alterar o volume: " + (e.message || e));
     }
   }
-  N.closePlayer = function () {
+  N.closePlayer = function (skipRender) {
     if (!root) return;
-    save();
+    /* O botão Return do controle chega aqui antes de interromper o AVPlay. */
+    save(true);
     clearInterval(saveTimer);
     clearTimeout(hideTimer);
+    if (N.playerScrubCancel) N.playerScrubCancel();
     playbackGeneration++;
     try {
       stopCurrentPlayback();
@@ -314,6 +399,6 @@
     if (appElement) appElement.classList.remove("avplay-hidden");
     current = null;
     N.playerActive = false;
-    N.render();
+    if (!skipRender) N.render();
   };
 })(Noir);

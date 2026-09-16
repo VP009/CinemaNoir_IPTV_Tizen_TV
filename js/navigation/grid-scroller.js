@@ -10,13 +10,13 @@
 
   function clampTrackY(viewport, track, y) {
     if (!viewport || !track) return 0;
-    var maxY = Math.max(0, track.scrollHeight - viewport.clientHeight);
+    var maxY = track._scroller ? track._scroller.getMaxY() : Math.max(0, track.scrollHeight - viewport.clientHeight);
     return Math.max(0, Math.min(maxY, Number(y) || 0));
   }
 
   function setSeriesY(y) {
-    var viewport = document.querySelector(".grid-scroll");
     var grid = document.getElementById("catalog");
+    var viewport = grid && grid.parentElement || document.querySelector(".grid-scroll");
     if (!viewport || !grid) return 0;
     y = clampTrackY(viewport, grid, y);
     grid.setAttribute("data-offset-y", String(y));
@@ -26,8 +26,8 @@
   }
 
   function setCategoryY(y) {
-    var viewport = document.querySelector(".category-scroll");
     var list = document.getElementById("categories");
+    var viewport = list && list.parentElement || document.querySelector(".category-scroll");
     if (!viewport || !list) return 0;
     y = clampTrackY(viewport, list, y);
     list.setAttribute("data-offset-y", String(y));
@@ -37,8 +37,8 @@
   }
 
   function setEpisodeY(y) {
-    var viewport = document.querySelector(".episode-scroll");
     var list = document.getElementById("episodes");
+    var viewport = list && list.parentElement || document.querySelector(".episode-scroll");
     if (!viewport || !list) return 0;
     y = clampTrackY(viewport, list, y);
     list.setAttribute("data-offset-y", String(y));
@@ -48,8 +48,8 @@
   }
 
   function ensureSeriesVisible(index) {
-    var viewport = document.querySelector(".grid-scroll");
     var grid = document.getElementById("catalog");
+    var viewport = grid && grid.parentElement || document.querySelector(".grid-scroll");
     if (!viewport || !grid || index < 0) return 0;
     var columns = grid._scroller && grid._scroller.columns || 6;
     var row = Math.floor(index / columns);
@@ -67,8 +67,8 @@
   }
 
   function ensureCategoryVisible(index) {
-    var viewport = document.querySelector(".category-scroll");
     var list = document.getElementById("categories");
+    var viewport = list && list.parentElement || document.querySelector(".category-scroll");
     if (!viewport || !list || index < 0) return 0;
     var itemTop = index * CATEGORY_ROW_HEIGHT;
     var itemBottom = itemTop + 76;
@@ -84,8 +84,8 @@
   }
 
   function ensureEpisodeVisible(index) {
-    var viewport = document.querySelector(".episode-scroll");
     var list = document.getElementById("episodes");
+    var viewport = list && list.parentElement || document.querySelector(".episode-scroll");
     if (!viewport || !list || index < 0) return 0;
     var itemTop = index * EPISODE_ROW_HEIGHT;
     var itemBottom = itemTop + 104;

@@ -310,6 +310,7 @@
           var saved = savedProgress(kind, i),
             titleText = String(i.name || i.title || "Sem título") + (kind === "series" && saved ? " · S" + (saved.seasonNumber || saved.item && saved.item.season || "") + ":E" + (saved.episodeNumber || saved.item && saved.item.episode_num || "") : ""),
             titleHtml = esc(titleText),
+            marqueeClass = titleText.length > 19 ? "title-marquee is-overflowing" : "title-marquee",
             percent =
               saved && saved.duration
                 ? Math.min(
@@ -323,7 +324,7 @@
             N.contentId(i) +
             '"><img loading="lazy" src="' +
             esc(i.stream_icon || i.cover || "assets/fallback.svg") +
-            '" onerror="this.onerror=null;this.src=\'assets/fallback.svg\'"><span class="label"><span class="title-marquee"><span class="title-copy">' +
+            '" onerror="this.onerror=null;this.src=\'assets/fallback.svg\'"><span class="label"><span class="' + marqueeClass + '"><span class="title-copy">' +
             titleHtml +
             '</span><span class="title-copy title-copy-clone" aria-hidden="true">' + titleHtml + "</span></span></span>" +
             (percent
@@ -348,11 +349,6 @@
       };
       b.onfocus = function () {
         root.dataset.lastIndex = this.dataset.index;
-        var label = this.querySelector(".label"), marquee = this.querySelector(".title-marquee"), copy = this.querySelector(".title-copy");
-        if (label && marquee && copy) {
-          if (copy.scrollWidth - 42 > label.clientWidth) marquee.classList.add("is-overflowing");
-          else marquee.classList.remove("is-overflowing");
-        }
         if (kind === "live") {
           N.focusHistory.patch(kind, { focusedChannelId: N.contentId(item), channelIndex: Number(this.dataset.index) });
           var preview = document.getElementById("live-preview");

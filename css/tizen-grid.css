@@ -8,7 +8,7 @@
   --category-width:320px;--category-height:76px;--category-gap:14px;
   --episode-height:104px;--episode-gap:16px;
   --font-xs:16px;--font-sm:18px;--font-md:22px;--font-lg:28px;--font-xl:36px;--font-xxl:48px;
-  --focus-duration:90ms;--scroll-duration:140ms;
+  --focus-duration:55ms;--scroll-duration:80ms;
 }
 *,*::before,*::after{box-sizing:border-box}
 html,body{width:100%;height:100%;margin:0;overflow:hidden}
@@ -128,8 +128,8 @@ button .ui-icon,.toolbar-action .ui-icon,header button .ui-icon{filter:none!impo
   .media-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
   .detail-page>img{width:240px;height:360px}
 }
-.fast-navigation .poster{transition-duration:50ms}
-.fast-navigation .media-grid,.fast-navigation .category-list,.fast-navigation .episode-grid{transition-duration:90ms!important}
+.fast-navigation .poster{transition-duration:25ms}
+.fast-navigation .media-grid,.fast-navigation .category-list,.fast-navigation .episode-grid{transition-duration:45ms!important}
 
 /* Home exclusiva, centralizada e dimensionada para televisores grandes. */
 header{height:112px;padding:24px clamp(36px,4vw,78px);background:rgba(9,7,14,.92);border-bottom:1px solid rgba(255,255,255,.06)}
@@ -145,7 +145,7 @@ header .active-profile{margin-left:auto;padding:9px 16px;border:1px solid rgba(1
 .home-primary-grid,.home-secondary-grid{position:relative;z-index:1;display:grid;width:100%;justify-content:center}
 .home-primary-grid{grid-template-columns:repeat(3,minmax(280px,360px));gap:28px}
 .home-secondary-grid{grid-template-columns:repeat(3,minmax(210px,270px));gap:18px}
-.home-card{margin:0!important;text-align:left;transform:translateZ(0);transition:transform 110ms ease-out,border-color 110ms ease-out,background-color 110ms ease-out,box-shadow 110ms ease-out}
+.home-card{margin:0!important;text-align:left;transform:translateZ(0);transition:transform 70ms ease-out,border-color 70ms ease-out,background-color 70ms ease-out,box-shadow 70ms ease-out}
 .home-main-card{display:flex;height:220px;flex-direction:column;justify-content:space-between;padding:28px;background:linear-gradient(145deg,rgba(29,24,39,.98),rgba(15,12,21,.98));border-color:rgba(255,255,255,.08);box-shadow:0 18px 42px rgba(0,0,0,.24)}
 .home-main-card>span{display:flex;flex-direction:column;gap:7px}
 .home-main-card strong{margin:0;font-size:31px;line-height:1.1}

@@ -5,7 +5,15 @@
   try { stack = JSON.parse(sessionStorage.getItem("noir:navigation-stack") || "[]") || []; } catch (e) {}
   function pageName() { return location.hash.replace(/^#\//, "").split("/")[0] || "home"; }
   function storageKey(page) { return ((N.active && N.active.id) || "none") + ":" + (page || pageName()); }
-  function persist() { try { sessionStorage.setItem("noir:focus-history", JSON.stringify(pages)); sessionStorage.setItem("noir:navigation-stack", JSON.stringify(stack.slice(-30))); } catch (e) {} }
+  var persistTimer = null;
+  function persist() {
+    if (persistTimer) { clearTimeout(persistTimer); persistTimer = null; }
+    try { sessionStorage.setItem("noir:focus-history", JSON.stringify(pages)); sessionStorage.setItem("noir:navigation-stack", JSON.stringify(stack.slice(-30))); } catch (e) {}
+  }
+  function persistSoon() {
+    if (persistTimer) clearTimeout(persistTimer);
+    persistTimer = setTimeout(persist, 120);
+  }
   function findParentByClass(element, className) {
     var current = element;
     while (current) {
@@ -22,7 +30,7 @@
     pages: pages,
     pageName: pageName,
     get: function (page) { return pages[storageKey(page)] || {}; },
-    patch: function (page, patch) { var k = storageKey(page); pages[k] = Object.assign({}, pages[k] || {}, patch || {}); persist(); return pages[k]; },
+    patch: function (page, patch) { var k = storageKey(page); pages[k] = Object.assign({}, pages[k] || {}, patch || {}); persistSoon(); return pages[k]; },
     capture: function (page) {
       var el = N.getFocused ? N.getFocused() : document.activeElement, track = el && (findParentByClass(el, "media-grid") || findParentByClass(el, "category-list") || findParentByClass(el, "episode-grid") || findParentByClass(el, "season-list") || findParentByClass(el, "vertical-track") || findParentByClass(el, "horizontal-track"));
       var patch = { focusKey: el && el.id || null, region: track && (track.dataset.region || track.id) || null };
@@ -66,4 +74,6 @@
     popRoute: function () { var value = stack.pop() || null; persist(); return value; }
   };
   N.NavigationStack = stack;
+  window.addEventListener("pagehide", persist);
+  window.addEventListener("beforeunload", persist);
 })(Noir);

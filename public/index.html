@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#09070e">
+  <title>Gerenciar listas — Cinema Noir</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;padding:24px;background:radial-gradient(circle at top,#26193b 0,#0d0913 48%,#07060a 100%);color:#f6f2ff;font:16px system-ui,-apple-system,Segoe UI,sans-serif}.card{width:min(100%,590px);margin:3vh auto;padding:30px;border:1px solid #46375e;border-radius:22px;background:rgba(19,14,27,.96);box-shadow:0 30px 80px #0008}.brand{color:#b99bf4;font-size:12px;font-weight:800;letter-spacing:3px}h1{margin:8px 0 6px;font-size:30px}h2{margin:28px 0 10px;font-size:20px}p{margin:0 0 22px;color:#b9afc4;line-height:1.5}label{display:block;margin:15px 0 7px;color:#d8d0df;font-weight:650}input{width:100%;height:52px;padding:0 15px;border:1px solid #514164;border-radius:11px;outline:0;background:#0c0911;color:#fff;font:inherit}input:focus{border-color:#b99bf4;box-shadow:0 0 0 3px #8b5cf633}.code{text-align:center;letter-spacing:9px;font-size:25px;font-weight:800}.primary{width:100%;height:56px;margin-top:20px;border:0;border-radius:12px;background:#8b5cf6;color:#fff;font:700 18px inherit;cursor:pointer}button:disabled{opacity:.55}.message{min-height:24px;margin:15px 0 0;text-align:center}.ok{color:#86efac}.error{color:#fca5a5}.hidden{display:none}.device-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:26px 0 10px}.device-head h2{margin:0}.disconnect{border:0;background:none;color:#c4b5fd;font:600 14px inherit}.lists{display:flex;flex-direction:column;gap:10px}.list{display:flex;align-items:center;gap:10px;padding:13px 14px;border:1px solid #3b3049;border-radius:12px;background:#100c17}.list strong{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.badge{padding:4px 8px;border-radius:20px;background:#244431;color:#86efac;font-size:12px}.list button{padding:8px 10px;border:1px solid #59466d;border-radius:8px;background:#241a30;color:#e9ddf8;font:600 13px inherit}.list .remove{border-color:#683c48;color:#fca5a5}.empty{padding:18px;border:1px dashed #4c3b5e;border-radius:12px;color:#9f94aa;text-align:center}.divider{height:1px;margin:25px 0;background:#382d45}@media(max-width:620px){body{padding:12px}.card{margin:0;padding:22px 18px;border-radius:18px}.list{align-items:flex-start;flex-wrap:wrap}.list strong{flex-basis:70%}.code{letter-spacing:7px}}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <span class="brand">CINEMA NOIR</span><h1>Gerenciar listas da TV</h1>
+    <section id="connect"><p>Digite o código numérico mostrado na tela da TV.</p><form id="connect-form"><label for="code">Código da TV</label><input id="code" class="code" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" autocomplete="one-time-code" required><button class="primary" type="submit">Conectar à TV</button></form></section>
+    <section id="manager" class="hidden">
+      <div class="device-head"><h2>Minhas listas</h2><button id="disconnect" class="disconnect" type="button">Trocar código</button></div>
+      <div id="lists" class="lists"></div><div class="divider"></div>
+      <h2>Adicionar outra lista</h2><p>Você pode adicionar quantas listas quiser enquanto o código estiver ativo.</p>
+      <form id="add-form"><label for="name">Nome da lista</label><input id="name" maxlength="60" value="Minha lista" required><label for="url">Servidor</label><input id="url" placeholder="http://servidor:porta" inputmode="url" required><label for="username">Usuário</label><input id="username" autocomplete="username" required><label for="password">Senha</label><input id="password" type="password" autocomplete="current-password" required><button id="send" class="primary" type="submit">Adicionar na TV</button></form>
+    </section>
+    <div id="message" class="message" role="status"></div>
+  </main>
+  <script>
+    (function(){
+      var codeInput=document.getElementById("code"),connect=document.getElementById("connect"),manager=document.getElementById("manager"),message=document.getElementById("message"),lists=document.getElementById("lists"),currentCode="",pollTimer=null,lastEvent="";
+      codeInput.value=(new URLSearchParams(location.search).get("code")||"").replace(/\D/g,"").slice(0,6);
+      codeInput.oninput=function(){this.value=this.value.replace(/\D/g,"").slice(0,6);};
+      function show(text,type){message.className="message "+(type||"");message.textContent=text||"";}
+      async function api(method,body){var url="/api/pair",options={method:method,headers:{"Content-Type":"application/json"}};if(method==="GET")url+="?code="+encodeURIComponent(currentCode);else options.body=JSON.stringify(Object.assign({code:currentCode},body||{}));var response=await fetch(url,options),data=await response.json();if(!response.ok)throw new Error(data.error||"Falha na comunicação.");return data;}
+      function escapeHtml(value){var div=document.createElement("div");div.textContent=String(value||"");return div.innerHTML;}
+      function render(data){
+        var device=data.device||{lists:[]},items=device.lists||[];
+        lists.innerHTML=items.length?items.map(function(item){var active=item.id===device.activeId;return '<div class="list"><strong>'+escapeHtml(item.name)+'</strong>'+(active?'<span class="badge">Ativa</span>':'<button type="button" data-action="activate" data-id="'+escapeHtml(item.id)+'">Ativar</button>')+'<button class="remove" type="button" data-action="remove" data-id="'+escapeHtml(item.id)+'">Remover</button></div>';}).join(""):'<div class="empty">Nenhuma lista cadastrada.</div>';
+        Array.prototype.forEach.call(lists.querySelectorAll("button"),function(button){button.onclick=function(){command(this.dataset.action,this.dataset.id);};});
+        var events=data.events||[],latest=events.length?events[events.length-1]:null;
+        if(latest&&latest.id!==lastEvent){lastEvent=latest.id;show(latest.message,latest.status==="error"?"error":"ok");}
+        else if(data.queued)show("Aguardando a TV aplicar "+data.queued+" alteração(ões)…","");
+      }
+      async function refresh(){if(!currentCode)return;try{render(await api("GET"));}catch(error){show(error.message,"error");if(/expirado|inexistente/i.test(error.message))disconnect();}}
+      function start(){connect.classList.add("hidden");manager.classList.remove("hidden");clearInterval(pollTimer);pollTimer=setInterval(refresh,3000);refresh();}
+      function disconnect(){clearInterval(pollTimer);pollTimer=null;currentCode="";manager.classList.add("hidden");connect.classList.remove("hidden");codeInput.value="";show("","");codeInput.focus();}
+      async function command(action,id){try{show(action==="remove"?"Solicitando remoção…":"Solicitando alteração…","");await api("POST",{action:action,profileId:id});await refresh();}catch(error){show(error.message,"error");}}
+      document.getElementById("connect-form").onsubmit=async function(event){event.preventDefault();currentCode=codeInput.value;if(!/^\d{6}$/.test(currentCode)){show("Digite os 6 números mostrados na TV.","error");return;}try{var data=await api("GET");start();render(data);show("TV conectada. Você já pode gerenciar as listas.","ok");}catch(error){currentCode="";show(error.message,"error");}};
+      document.getElementById("disconnect").onclick=disconnect;
+      document.getElementById("add-form").onsubmit=async function(event){event.preventDefault();var button=document.getElementById("send");button.disabled=true;show("Enviando lista para a TV…","");try{await api("POST",{action:"add",list:{name:document.getElementById("name").value,baseUrl:document.getElementById("url").value,username:document.getElementById("username").value,password:document.getElementById("password").value}});document.getElementById("url").value="";document.getElementById("username").value="";document.getElementById("password").value="";show("Lista enviada. Aguarde a confirmação da TV.","ok");await refresh();}catch(error){show(error.message,"error");}button.disabled=false;};
+      if(codeInput.value.length===6)document.getElementById("connect-form").dispatchEvent(new Event("submit",{cancelable:true}));
+    }());
+  </script>
+</body>
+</html>

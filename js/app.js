@@ -18,10 +18,57 @@
     s = String(s || "").toLowerCase();
     return s.normalize ? s.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : s;
   }
+  function buildEpisodeOptions(seriesItem, seasons, episode, requestedSeason) {
+    seasons = seasons || {};
+    var keys = Object.keys(seasons).sort(function (a, b) { return Number(a) - Number(b); }),
+      episodeId = N.contentId(episode), seasonKey = String(requestedSeason || episode.season || ""), seasonIndex, list, episodeIndex = -1;
+    if (!seasons[seasonKey]) {
+      for (var k = 0; k < keys.length && episodeIndex < 0; k += 1) {
+        list = seasons[keys[k]] || [];
+        for (var e = 0; e < list.length; e += 1) if (N.contentId(list[e]) === episodeId) { seasonKey = keys[k]; episodeIndex = e; episode = list[e]; break; }
+      }
+    }
+    seasonIndex = keys.indexOf(seasonKey);
+    list = seasons[seasonKey] || [];
+    if (episodeIndex < 0) for (var i = 0; i < list.length; i += 1) if (N.contentId(list[i]) === episodeId) { episodeIndex = i; episode = list[i]; break; }
+    var prev = episodeIndex > 0 ? list[episodeIndex - 1] : null,
+      next = episodeIndex >= 0 && episodeIndex < list.length - 1 ? list[episodeIndex + 1] : null,
+      prevSeasonKey = seasonKey, nextSeasonKey = seasonKey;
+    if (!prev && seasonIndex > 0) for (var p = seasonIndex - 1; p >= 0 && !prev; p -= 1) {
+      var prevList = seasons[keys[p]] || [];
+      if (prevList.length) { prev = prevList[prevList.length - 1]; prevSeasonKey = keys[p]; }
+    }
+    if (!next && seasonIndex >= 0) for (var n = seasonIndex + 1; n < keys.length && !next; n += 1) {
+      var nextList = seasons[keys[n]] || [];
+      if (nextList.length) { next = nextList[0]; nextSeasonKey = keys[n]; }
+    }
+    function open(target, targetSeason) {
+      N.openPlayer("episode", target, target.title || seriesItem.name, buildEpisodeOptions(seriesItem, seasons, target, target.season || targetSeason));
+    }
+    return {
+      seriesId: N.contentId(seriesItem), seriesName: seriesItem.name, seriesPoster: seriesItem.cover,
+      seasonNumber: seasonKey, prevItem: prev, nextItem: next,
+      nextSeasonNumber: next ? next.season || nextSeasonKey : null,
+      prev: prev ? function () { open(prev, prevSeasonKey); } : null,
+      next: next ? function () { open(next, nextSeasonKey); } : null
+    };
+  }
+  function resumeEpisode(record) {
+    var seriesItem = { series_id: record.seriesId, name: record.seriesName || record.title || "Série", cover: record.seriesPoster },
+      episode = record.item;
+    N.toast("Carregando episódios…");
+    N.request(N.active, "get_series_info", { series_id: record.seriesId }).then(function (info) {
+      var seasons = info.episodes || {}, options = buildEpisodeOptions(seriesItem, seasons, episode, record.seasonNumber || episode.season);
+      N.openPlayer("episode", episode, record.title || seriesItem.name, options);
+    }).catch(function () {
+      N.openPlayer("episode", episode, record.title || seriesItem.name, { seriesId: record.seriesId, seriesName: seriesItem.name, seriesPoster: seriesItem.cover, seasonNumber: record.seasonNumber || episode.season });
+    });
+  }
   function header() {
     return '<header class="home-status-bar"><span id="clock"></span></header>';
   }
   function page(body, showHeader, viewportClass) {
+    if (N.stopPairing) N.stopPairing();
     getApp().innerHTML =
       (showHeader ? header() : "") +
       '<div class="viewport ' +
@@ -156,10 +203,11 @@
     page(
       '<div class="home-page"><div class="home-intro"><div class="eyebrow">Sua central de entretenimento</div><h1>O que você quer assistir?</h1><p>' +
         esc(N.active.name) +
-        '</p></div><div class="home-actions home-primary-actions" style="display:-webkit-flex;display:flex;-webkit-flex-direction:row;flex-direction:row;-webkit-flex-wrap:nowrap;flex-wrap:nowrap"><button id="home-live" class="home-card home-action-card" data-route="live" data-nav-left="home-live" data-nav-right="home-movies" data-nav-up="home-live" data-nav-down="home-continue">'+icon("tv")+'<span><strong>TV ao vivo</strong><small data-count="live">Carregando…</small></span></button><button id="home-movies" class="home-card home-action-card" data-route="movies" data-nav-left="home-live" data-nav-right="home-series" data-nav-up="home-movies" data-nav-down="home-search">'+icon("film")+'<span><strong>Filmes</strong><small data-count="movies">Carregando…</small></span></button><button id="home-series" class="home-card home-action-card" data-route="series" data-nav-left="home-movies" data-nav-right="home-series" data-nav-up="home-series" data-nav-down="home-settings">'+icon("clapperboard")+'<span><strong>Séries</strong><small data-count="series">Carregando…</small></span></button></div><div class="home-actions home-secondary-actions" style="display:-webkit-flex;display:flex;-webkit-flex-direction:row;flex-direction:row;-webkit-flex-wrap:nowrap;flex-wrap:nowrap"><button id="home-continue" class="home-card home-action-card home-compact-card" data-route="continue" data-nav-up="home-live" data-nav-left="home-continue" data-nav-right="home-search" data-nav-down="home-continue">'+icon("clock")+'<span><strong>Continuar</strong></span></button><button id="home-search" class="home-card home-action-card home-compact-card" data-route="search" data-nav-up="home-movies" data-nav-left="home-continue" data-nav-right="home-settings" data-nav-down="home-search">'+icon("search")+'<span><strong>Pesquisar</strong></span></button><button id="home-settings" class="home-card home-action-card home-compact-card" data-route="settings" data-nav-up="home-series" data-nav-left="home-search" data-nav-right="home-settings" data-nav-down="home-settings">'+icon("settings")+'<span><strong>Configurações</strong></span></button></div></div>',
+        '</p></div><div class="home-actions home-primary-actions" style="display:-webkit-flex;display:flex;-webkit-flex-direction:row;flex-direction:row;-webkit-flex-wrap:nowrap;flex-wrap:nowrap"><button id="home-live" class="home-card home-action-card" data-route="live" data-nav-left="home-live" data-nav-right="home-movies" data-nav-up="home-live" data-nav-down="home-continue">'+icon("tv")+'<span><strong>TV ao vivo</strong><small data-count="live">Carregando…</small></span></button><button id="home-movies" class="home-card home-action-card" data-route="movies" data-nav-left="home-live" data-nav-right="home-series" data-nav-up="home-movies" data-nav-down="home-search">'+icon("film")+'<span><strong>Filmes</strong><small data-count="movies">Carregando…</small></span></button><button id="home-series" class="home-card home-action-card" data-route="series" data-nav-left="home-movies" data-nav-right="home-series" data-nav-up="home-series" data-nav-down="home-settings">'+icon("clapperboard")+'<span><strong>Séries</strong><small data-count="series">Carregando…</small></span></button></div><div class="home-actions home-secondary-actions" style="display:-webkit-flex;display:flex;-webkit-flex-direction:row;flex-direction:row;-webkit-flex-wrap:nowrap;flex-wrap:nowrap"><button id="home-continue" class="home-card home-action-card home-compact-card" data-route="continue" data-nav-up="home-live" data-nav-left="home-continue" data-nav-right="home-search" data-nav-down="home-continue">'+icon("clock")+'<span><strong>Continuar</strong></span></button><button id="home-search" class="home-card home-action-card home-compact-card" data-route="search" data-nav-up="home-movies" data-nav-left="home-continue" data-nav-right="home-settings" data-nav-down="home-search">'+icon("search")+'<span><strong>Pesquisar</strong></span></button><button id="home-settings" class="home-card home-action-card home-compact-card" data-route="settings" data-nav-up="home-series" data-nav-left="home-search" data-nav-right="home-settings" data-nav-down="home-settings">'+icon("settings")+'<span><strong>Configurações</strong></span></button></div>' + (N.pairingMarkup ? N.pairingMarkup() : "") + '</div>',
       true,
       "home-viewport",
     );
+    if (N.startPairing) N.startPairing();
     ["live", "movies", "series"].forEach(function (k) {
       N.catalog(k)
         .then(function (d) {
@@ -511,7 +559,7 @@
             icon("rotate-ccw") +
             " Voltar ao início</button>";
           document.getElementById("series-continue").onclick = function () {
-            N.openPlayer("episode", latest.item, latest.title || item.name, { seriesId: N.contentId(item), seriesName: item.name, seriesPoster: item.cover });
+            N.openPlayer("episode", latest.item, latest.title || item.name, buildEpisodeOptions(item, seasons, latest.item, latest.seasonNumber || latest.item.season));
           };
           document.getElementById("series-restart").onclick = function () {
             selected = keys[0];
@@ -578,62 +626,10 @@
               })
               .join("") ||
             '<div class="empty">Nenhum episódio nesta temporada.</div>';
-          function buildEpisodeOptions(episode, seasonKey) {
-            var seasonIndex = keys.indexOf(String(seasonKey)),
-              listForSeason = seasons[String(seasonKey)] || [],
-              episodeIndex = listForSeason.indexOf(episode),
-              prev = episodeIndex > 0 ? listForSeason[episodeIndex - 1] : null,
-              next = episodeIndex >= 0 && episodeIndex < listForSeason.length - 1 ? listForSeason[episodeIndex + 1] : null,
-              prevSeasonKey = String(seasonKey), nextSeasonKey = String(seasonKey);
-            if (!prev && seasonIndex > 0) {
-              for (var previousIndex = seasonIndex - 1; previousIndex >= 0 && !prev; previousIndex -= 1) {
-                var prevSeason = keys[previousIndex], prevList = seasons[prevSeason] || [];
-                if (prevList.length) { prev = prevList[prevList.length - 1]; prevSeasonKey = String(prevSeason); }
-              }
-            }
-            if (!next && seasonIndex < keys.length - 1) {
-              for (var nextIndex = seasonIndex + 1; nextIndex < keys.length && !next; nextIndex += 1) {
-                var nextSeason = keys[nextIndex];
-                if (nextSeason && seasons[nextSeason] && seasons[nextSeason][0]) {
-                  next = seasons[nextSeason][0];
-                  nextSeasonKey = String(nextSeason);
-                }
-              }
-            }
-            return {
-              seriesId: N.contentId(item),
-              seriesName: item.name,
-              seriesPoster: item.cover,
-              seasonNumber: String(seasonKey),
-              prevItem: prev,
-              nextItem: next,
-              nextSeasonNumber: next ? next.season || nextSeasonKey : null,
-              prev: prev
-                ? function () {
-                    N.openPlayer(
-                      "episode",
-                      prev,
-                      prev.title || item.name,
-                      buildEpisodeOptions(prev, prev.season || prevSeasonKey),
-                    );
-                  }
-                : null,
-              next: next
-                ? function () {
-                    N.openPlayer(
-                      "episode",
-                      next,
-                      next.title || item.name,
-                      buildEpisodeOptions(next, next.season || nextSeasonKey),
-                    );
-                  }
-                : null,
-            };
-          }
           list.forEach(function (ep, n) {
             document.getElementById("EPISODE_" + N.contentId(ep)).onclick =
               function () {
-                N.openPlayer("episode", ep, ep.title || item.name, buildEpisodeOptions(ep, selected));
+                N.openPlayer("episode", ep, ep.title || item.name, buildEpisodeOptions(item, seasons, ep, selected));
               };
           });
         }
@@ -757,15 +753,13 @@
   }
   function continuing() {
     var all = N.WatchProgressStore.getContinueWatchingMovies().concat(N.WatchProgressStore.getContinueWatchingSeries());
+    all.sort(function (a, b) { return b.updatedAt - a.updatedAt; });
     page(
       '<div class="static-page"><div class="toolbar"><h1>Continuar assistindo</h1></div><div class="standalone-grid-viewport"><div id="continue-list" class="grid vertical-track" data-region="continue-grid"></div></div></div>',
     );
     var root = document.getElementById("continue-list");
     root.innerHTML =
       all
-        .sort(function (a, b) {
-          return b.updatedAt - a.updatedAt;
-        })
         .map(function (x, n) {
           return (
             '<button class="poster" id="continue-' +
@@ -783,7 +777,8 @@
       var b = document.getElementById("continue-" + n);
       if (b)
         b.onclick = function () {
-          N.openPlayer(x.kind, x.item, x.title, x.kind === "episode" ? { seriesId: x.seriesId, seriesName: x.seriesName, seriesPoster: x.seriesPoster } : {});
+          if (x.kind === "episode") resumeEpisode(x);
+          else N.openPlayer(x.kind, x.item, x.title, {});
         };
     });
     restore();

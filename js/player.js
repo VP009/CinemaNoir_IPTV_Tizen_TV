@@ -180,7 +180,7 @@
       document.getElementById("app").classList.add("avplay-hidden");
       video.style.display = "none";
     }
-    var url = N.streamUrl(kind, item), saved = kind === "episode" ? N.WatchProgressStore.getEpisodeProgress(N.contentId(item)) : kind === "movies" ? N.WatchProgressStore.getMovieProgress(N.contentId(item)) : null;
+    var url = String(N.streamUrl(kind, item) || "").trim(), saved = kind === "episode" ? N.WatchProgressStore.getEpisodeProgress(N.contentId(item)) : kind === "movies" ? N.WatchProgressStore.getMovieProgress(N.contentId(item)) : null;
     scrub = { active: false, target: 0, duration: 0, origin: 0 };
     root.querySelectorAll("button").forEach(function (b) {
       b.onclick = function () {
@@ -232,18 +232,23 @@
       return;
     }
     function valid() { return root && generation === playbackGeneration; }
-    function failed(error) { if (valid()) status("AVPlay: " + (error && error.name || String(error || "Falha de reprodução")) + ". Verifique a transmissão ou tente outro canal."); }
+    function failed(error) { if (valid()) status("AVPlay: " + (error && (error.message || error.name) || String(error || "Falha de reprodução")) + ". Verifique a transmissão ou tente outro canal."); }
     try {
+      if (typeof url !== "string" || !/^https?:\/\/[^\s]+$/i.test(url)) throw new Error("URL de reprodução inválida");
       stopCurrentPlayback();
       av = webapis.avplay;
       activePlaybackEngine = "avplay";
-      av.open(url);
+      av.open(String(url));
       av.setDisplayRect(0, 0, 1920, 1080);
       av.setListener({
         onbufferingstart: function () { if (valid()) status("Carregando…"); },
+        onbufferingprogress: function () {},
         onbufferingcomplete: function () { if (valid()) status(""); },
         oncurrentplaytime: function () { if (valid()) setProgress(); },
         onstreamcompleted: function () { if (valid()) completed(); },
+        onevent: function () {},
+        onsubtitlechange: function () {},
+        ondrmevent: function () {},
         onerror: failed
       });
       av.prepareAsync(function () {

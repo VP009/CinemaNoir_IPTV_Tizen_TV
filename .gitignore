@@ -1,5 +1,6 @@
 .vercel
 .env*
 node_modules/
+.buildResult/
 .agents/
 skills-lock.json

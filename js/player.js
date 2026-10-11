@@ -1,6 +1,6 @@
 (function (N) {
   "use strict";
-  var root, video, av, hideTimer, saveTimer, current, activePlaybackEngine = null, playbackGeneration = 0,
+  var root, video, av, hideTimer, saveTimer, clockTimer, current, activePlaybackEngine = null, playbackGeneration = 0,
     scrub = { active: false, target: 0, duration: 0, origin: 0 }, miniAv = null, miniVideo = null, miniPlane = null, miniGeneration = 0, miniItem = null, miniStartTimer = null, queuedMiniItem = null;
   function progressKey() {
     return N.key("progress", current.kind + ":" + N.contentId(current.item));
@@ -183,9 +183,10 @@
   }
   function renderTimeline(position, duration, preview) {
     if (!root) return;
-    var bar = root.querySelector(".progress i"), time = root.querySelector(".time"), hint = root.querySelector(".seek-hint");
+    var bar = root.querySelector(".progress i"), currentTime = root.querySelector(".time-current"), durationTime = root.querySelector(".time-duration"), hint = root.querySelector(".seek-hint");
     if (bar) bar.style.width = (duration ? Math.max(0, Math.min(100, (position / duration) * 100)) : 0) + "%";
-    if (time) time.textContent = format(position / 1000) + " / " + format(duration / 1000);
+    if (currentTime) currentTime.textContent = format(position / 1000);
+    if (durationTime) durationTime.textContent = format(duration / 1000);
     if (hint) { hint.hidden = !preview; hint.textContent = preview ? "Solte para ir até " + format(position / 1000) : ""; }
     root.classList.toggle("scrubbing", !!preview);
   }
@@ -194,7 +195,7 @@
     if (!prompt || !current || current.kind !== "episode" || !current.options.next || !duration) return;
     var remaining = Math.max(0, duration - position), show = remaining <= 40000;
     if (!show && N.getFocused && N.getFocused() === prompt) {
-      var permanentNext = root.querySelector('.player-side-actions [data-action="next"]');
+      var permanentNext = root.querySelector('.player-controls [data-action="next"]');
       if (permanentNext) N.focus(permanentNext);
     }
     prompt.hidden = !show;
@@ -223,13 +224,18 @@
       s
     );
   }
+  function updatePlayerClock() {
+    if (!root) return;
+    var clock = root.querySelector(".player-clock"), now = new Date(), hours = now.getHours(), minutes = now.getMinutes();
+    if (clock) clock.textContent = (hours < 10 ? "0" : "") + hours + ":" + (minutes < 10 ? "0" : "") + minutes;
+  }
   N.playerActivity = function () {
     if (!root) return;
     var ui = root.querySelector(".player-ui");
-    var sideActions = root.querySelector(".player-side-actions");
+    var topbar = root.querySelector(".player-topbar");
     root.classList.remove("idle");
     if (ui) ui.classList.remove("hidden");
-    if (sideActions) sideActions.classList.remove("hidden");
+    if (topbar) topbar.classList.remove("hidden");
     var focused = N.getFocused && N.getFocused();
     if ((!focused || (root.contains && !root.contains(focused))) && N.focus) {
       N.focus(root.querySelector('[data-action="timeline"]') || root.querySelector("button"));
@@ -239,7 +245,7 @@
       if (root) {
         root.classList.add("idle");
         if (ui) ui.classList.add("hidden");
-        if (sideActions) sideActions.classList.add("hidden");
+        if (topbar) topbar.classList.add("hidden");
       }
     }, 3000);
   };
@@ -253,27 +259,67 @@
     root = document.createElement("div");
     root.className = "player player-page";
     root.innerHTML =
-      '<video id="video-player" class="video-player" playsinline></video><div class="player-status">Preparando reprodução...</div><div class="player-ui"><h2></h2><button class="player-progress-wrapper" aria-label="Linha do tempo" data-action="timeline"><span class="progress"><i></i></span><span class="time">0:00</span><span class="seek-hint" hidden></span></button><div class="row player-controls"><button class="player-control" aria-label="Voltar" data-action="close">' + iconHtml("arrow-left") + '</button><button class="player-control" aria-label="Voltar 30 segundos" data-action="backward">' + iconHtml("skip-back") + '<small>30</small></button><button class="player-control" aria-label="Pausar ou reproduzir" data-action="toggle">' + iconHtml("pause") + '</button><button class="player-control" aria-label="Avançar 30 segundos" data-action="forward">' + iconHtml("skip-forward") + '<small>30</small></button></div></div><div class="player-side-actions"></div>';
+      '<video id="video-player" class="video-player" playsinline></video>' +
+      '<div class="player-status">Preparando reprodução...</div>' +
+      '<div class="player-topbar">' +
+        '<button id="player-back" class="player-back" aria-label="Voltar" data-action="close" data-nav-down="player-timeline">' + iconHtml("arrow-left") + '<span>Voltar</span></button>' +
+        '<h2 class="player-title"></h2>' +
+        '<time class="player-clock" aria-label="Hora atual"></time>' +
+      '</div>' +
+      '<div class="player-ui">' +
+        '<button id="player-timeline" class="player-progress-wrapper" aria-label="Linha do tempo. Use esquerda e direita para buscar" data-action="timeline" data-nav-up="player-back" data-nav-down="player-toggle">' +
+          '<span class="progress"><i></i></span>' +
+          '<span class="player-time-row"><span class="time time-current">0:00</span><span class="time time-duration">--:--</span></span>' +
+          '<span class="seek-hint" hidden></span>' +
+        '</button>' +
+        '<div class="row player-controls"></div>' +
+      '</div>';
     document.body.appendChild(root);
-    var sideActions = root.querySelector(".player-side-actions");
-    if (current.options.prev) {
-      var prev = document.createElement("button");
-      prev.className = "player-control";
-      prev.dataset.action = "prev";
-      prev.setAttribute("aria-label", "Episódio anterior");
-      prev.innerHTML = iconHtml("chevron-left");
-      sideActions.appendChild(prev);
+    var controls = root.querySelector(".player-controls"), previousControl = null, nextControl = null;
+    if (current.kind === "episode") {
+      previousControl = document.createElement("button");
+      previousControl.className = "player-control player-episode-control";
+      previousControl.dataset.action = "prev";
+      previousControl.setAttribute("aria-label", "Episódio anterior");
+      previousControl.innerHTML = '<span class="player-control-icon">' + iconHtml("chevron-left") + '</span><small>Episódio anterior</small>';
+      previousControl.disabled = !current.options.prev;
+      controls.appendChild(previousControl);
+    }
+    var backwardControl = document.createElement("button");
+    backwardControl.className = "player-control";
+    backwardControl.dataset.action = "backward";
+    backwardControl.setAttribute("aria-label", "Voltar 30 segundos");
+    backwardControl.innerHTML = '<span class="player-control-icon player-seek-icon">' + iconHtml("skip-back") + '<b>30</b></span><small>Voltar 30 s</small>';
+    controls.appendChild(backwardControl);
+    var toggleControl = document.createElement("button");
+    toggleControl.id = "player-toggle";
+    toggleControl.className = "player-control player-toggle";
+    toggleControl.dataset.action = "toggle";
+    toggleControl.setAttribute("aria-label", "Pausar ou reproduzir");
+    toggleControl.innerHTML = '<span class="player-control-icon">' + iconHtml("pause") + '</span><small>Pausar</small>';
+    controls.appendChild(toggleControl);
+    var forwardControl = document.createElement("button");
+    forwardControl.className = "player-control";
+    forwardControl.dataset.action = "forward";
+    forwardControl.setAttribute("aria-label", "Avançar 30 segundos");
+    forwardControl.innerHTML = '<span class="player-control-icon player-seek-icon">' + iconHtml("skip-forward") + '<b>30</b></span><small>Avançar 30 s</small>';
+    controls.appendChild(forwardControl);
+    if (current.kind === "episode") {
+      nextControl = document.createElement("button");
+      nextControl.className = "player-control player-episode-control";
+      nextControl.dataset.action = "next";
+      nextControl.setAttribute("aria-label", "Próximo episódio");
+      nextControl.innerHTML = '<span class="player-control-icon">' + iconHtml("chevron-right") + '</span><small>Próximo episódio</small>';
+      nextControl.disabled = !current.options.next;
+      controls.appendChild(nextControl);
     }
     if (current.kind === "episode" && current.options.next) {
       var nextItem = current.options.nextItem || {}, currentSeasonNumber = current.options.seasonNumber || current.item.season || "",
         nextSeasonNumber = current.options.nextSeasonNumber || nextItem.season || currentSeasonNumber,
-        nextSeason = String(nextSeasonNumber) !== String(currentSeasonNumber), nextControl = document.createElement("button"), next = document.createElement("button"),
+        nextSeason = String(nextSeasonNumber) !== String(currentSeasonNumber), next = document.createElement("button"),
         nextLabel = (nextSeasonNumber ? "S" + nextSeasonNumber + " " : "") + (nextItem.episode_num ? "E" + nextItem.episode_num + " · " : "") + (nextItem.title || current.options.seriesName || "Próximo episódio");
-      nextControl.className = "player-control";
-      nextControl.dataset.action = "next";
       nextControl.setAttribute("aria-label", nextSeason ? "Próxima temporada" : "Próximo episódio");
-      nextControl.innerHTML = iconHtml("chevron-right");
-      sideActions.appendChild(nextControl);
+      nextControl.querySelector("small").textContent = nextSeason ? "Próxima temporada" : "Próximo episódio";
       next.className = "next-episode-prompt";
       next.dataset.action = "next";
       next.hidden = true;
@@ -282,7 +328,9 @@
       next.querySelector(".next-title").textContent = nextLabel;
       root.appendChild(next);
     }
-    root.querySelector("h2").textContent = title;
+    root.querySelector(".player-title").textContent = title;
+    updatePlayerClock();
+    clockTimer = setInterval(updatePlayerClock, 15000);
     video = root.querySelector("video");
     var useAVPlay = typeof webapis !== "undefined" && webapis.avplay;
     if (useAVPlay) {
@@ -417,17 +465,21 @@
         var state = av.getState();
         if (state === "PLAYING") {
           av.pause();
-          button.innerHTML = iconHtml("play");
+          button.querySelector(".player-control-icon").innerHTML = iconHtml("play");
+          button.querySelector("small").textContent = "Reproduzir";
         } else {
           av.play();
-          button.innerHTML = iconHtml("pause");
+          button.querySelector(".player-control-icon").innerHTML = iconHtml("pause");
+          button.querySelector("small").textContent = "Pausar";
         }
       } else if (video.paused) {
         video.play();
-        button.innerHTML = iconHtml("pause");
+        button.querySelector(".player-control-icon").innerHTML = iconHtml("pause");
+        button.querySelector("small").textContent = "Pausar";
       } else {
         video.pause();
-        button.innerHTML = iconHtml("play");
+        button.querySelector(".player-control-icon").innerHTML = iconHtml("play");
+        button.querySelector("small").textContent = "Reproduzir";
       }
       save();
     } catch (e) {
@@ -506,6 +558,7 @@
     /* O botão Return do controle chega aqui antes de interromper o AVPlay. */
     save(true);
     clearInterval(saveTimer);
+    clearInterval(clockTimer);
     clearTimeout(hideTimer);
     if (N.playerScrubCancel) N.playerScrubCancel();
     playbackGeneration++;

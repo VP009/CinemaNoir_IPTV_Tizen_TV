@@ -1,6 +1,6 @@
 (function (N) {
   "use strict";
-  N.APP_VERSION = "1.2.0";
+  N.APP_VERSION = "1.3.0";
   function parts(value) { return String(value || "0").split(".").map(function (part) { return parseInt(part, 10) || 0; }); }
   function newer(remote, local) { var a = parts(remote), b = parts(local), length = Math.max(a.length, b.length), i; for (i = 0; i < length; i += 1) { if ((a[i] || 0) > (b[i] || 0)) return true; if ((a[i] || 0) < (b[i] || 0)) return false; } return false; }
   function server() { return String(window.PAIRING_SERVER_URL || "").replace(/\/+$/, ""); }

@@ -31,6 +31,14 @@
     }
     return track._scroller;
   }
+  function itemIndex(track, list, el) {
+    var localIndex = list ? list.indexOf(el) : -1;
+    if (track && track._virtualTotal && el && el.dataset && el.dataset.index !== undefined) {
+      var globalIndex = Number(el.dataset.index);
+      if (isFinite(globalIndex) && globalIndex >= 0) return globalIndex;
+    }
+    return localIndex;
+  }
   N.activeFocus = null; N.previousFocusElement = null;
   N.getFocused = function () { return N.activeFocus && document.documentElement.contains(N.activeFocus) ? N.activeFocus : null; };
   N.focusables = function () {
@@ -40,7 +48,7 @@
   N.follow = function (el, knownTrack, knownList, knownIndex, knownScroller) {
     var track = knownTrack || parent(el), list = knownList || (track && items(track)), scroller = knownScroller || (track && bind(track, list));
     if (!scroller) return;
-    var index = knownIndex === undefined ? list.indexOf(el) : knownIndex;
+    var index = knownIndex === undefined ? itemIndex(track, list, el) : knownIndex;
     if (track.id === "categories") N.ensureCategoryVisible(index);
     else if (track.id === "catalog" && !track.closest(".live-layout")) N.ensureSeriesVisible(index);
     else if (track.id === "episodes" && N.ensureEpisodeVisible) N.ensureEpisodeVisible(index);
@@ -61,7 +69,7 @@
       document.activeElement.blur();
     }
     N.activeFocus = el; el.classList.add("focused"); el.setAttribute("data-focused", "true");
-    var track = parent(el), list = track && items(track), scroller = track && bind(track, list), index = track ? list.indexOf(el) : -1;
+    var track = parent(el), list = track && items(track), scroller = track && bind(track, list), index = track ? itemIndex(track, list, el) : -1;
     if (track && scroller) { N.FocusManager.currentIndex = index; N.FocusManager.columns = scroller.columns; track._lastFocus = el.id; }
     N.follow(el, track, list, index, scroller);
     if (!el.closest(".player,.keyboard,.tv-modal") && N.focusHistory) N.focusHistory.save(el);
@@ -73,7 +81,7 @@
   N.ensureFocus = function () { return N.getFocused() || N.focusHistory.restore() || N.focus(N.focusables()[0]); };
   N.FocusManager = window.FocusManager = {
     currentIndex: 0, columns: 6,
-    focus: function (index) { var track = parent(N.getFocused()) || document.getElementById("catalog") || document.getElementById("movieGrid"); return track ? N.focus(items(track)[index]) : false; },
+    focus: function (index) { var track = parent(N.getFocused()) || document.getElementById("catalog") || document.getElementById("movieGrid"); return track ? (track._focusVirtualIndex ? track._focusVirtualIndex(index) : N.focus(items(track)[index])) : false; },
     moveLeft: function () { N.moveFocus(37); }, moveRight: function () { N.moveFocus(39); },
     moveUp: function () { N.moveFocus(38); }, moveDown: function () { N.moveFocus(40); }
   };

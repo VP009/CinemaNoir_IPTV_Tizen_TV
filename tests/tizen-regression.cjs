@@ -169,6 +169,8 @@ assert.ok(appSource.includes("if (q) return match;"));
 assert.ok(appSource.includes('lookup.favorites[kind + ":" + N.contentId(i)]'));
 assert.ok(appSource.includes("lookup.progress[N.contentId(i)]"));
 assert.ok(appSource.includes("function renderWindow(centerIndex)"));
+assert.ok(fs.readFileSync("js/navigation/focus-manager.js","utf8").includes("function itemIndex(track, list, el)"));
+assert.ok(fs.readFileSync("js/navigation/focus-manager.js","utf8").includes("track._focusVirtualIndex ? track._focusVirtualIndex(index)"));
 assert.ok(appSource.includes("root._focusVirtualIndex = function"));
 assert.ok(!appSource.includes('more.id = "LOAD_MORE"'));
 assert.ok(appSource.includes("windowRows = kind === \"live\" ? 13 : 7"));

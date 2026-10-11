@@ -1,7 +1,7 @@
 (function (N) {
   "use strict";
   var root, video, av, hideTimer, saveTimer, current, activePlaybackEngine = null, playbackGeneration = 0,
-    scrub = { active: false, target: 0, duration: 0, origin: 0 };
+    scrub = { active: false, target: 0, duration: 0, origin: 0 }, miniAv = null, miniVideo = null, miniPlane = null, miniGeneration = 0, miniItem = null, miniStartTimer = null, queuedMiniItem = null;
   function progressKey() {
     return N.key("progress", current.kind + ":" + N.contentId(current.item));
   }
@@ -51,6 +51,102 @@
       el.hidden = !message;
     }
   }
+  function configuredBufferSeconds(kind) {
+    if (kind === "mini") return 10;
+    var live = kind === "live", configured = N.Settings ? N.Settings.get(live ? "liveBufferSeconds" : "vodBufferSeconds") : (live ? 60 : 10);
+    return live
+      ? Math.max(60, Math.min(300, Math.round(Number(configured) || 60)))
+      : Math.max(5, Math.min(120, Math.round(Number(configured) || 10)));
+  }
+  function applyAVBuffer(player, kind) {
+    if (!player || !player.setBufferingParam) return;
+    var seconds = configuredBufferSeconds(kind);
+    try { player.setBufferingParam("PLAYER_BUFFER_FOR_PLAY", "PLAYER_BUFFER_SIZE_IN_SECOND", seconds); }
+    catch (playError) { console.log("AVPLAY START BUFFER ERROR", playError); }
+    try { player.setBufferingParam("PLAYER_BUFFER_FOR_RESUME", "PLAYER_BUFFER_SIZE_IN_SECOND", seconds); }
+    catch (resumeError) { console.log("AVPLAY RESUME BUFFER ERROR", resumeError); }
+  }
+  N.stopLiveMiniPlayer = function () {
+    clearTimeout(miniStartTimer);
+    miniStartTimer = null;
+    queuedMiniItem = null;
+    miniGeneration += 1;
+    if (miniVideo) {
+      try { miniVideo.pause(); miniVideo.removeAttribute("src"); miniVideo.load(); } catch (ignoreVideo) {}
+      if (miniVideo.parentNode) miniVideo.parentNode.removeChild(miniVideo);
+      miniVideo = null;
+    }
+    if (miniPlane) {
+      if (miniPlane.parentNode) miniPlane.parentNode.removeChild(miniPlane);
+      miniPlane = null;
+    }
+    if (miniAv) {
+      try { if (miniAv.getState() !== "NONE" && miniAv.getState() !== "IDLE") miniAv.stop(); } catch (ignoreStop) {}
+      try { miniAv.close(); } catch (ignoreClose) {}
+      miniAv = null;
+    }
+    miniItem = null;
+  };
+  N.queueLiveMiniPlayer = function (item, delay) {
+    var stage = document.getElementById("live-mini-stage"), statusNode = document.getElementById("live-mini-status");
+    if (!stage || !item || N.playerActive) return false;
+    clearTimeout(miniStartTimer);
+    if (miniItem && N.contentId(miniItem) === N.contentId(item)) {
+      miniStartTimer = null;
+      queuedMiniItem = null;
+      if (statusNode) statusNode.hidden = true;
+      return true;
+    }
+    queuedMiniItem = item;
+    if (statusNode) { statusNode.hidden = false; statusNode.textContent = "Carregando prévia…"; }
+    miniStartTimer = setTimeout(function () {
+      var selected = queuedMiniItem;
+      miniStartTimer = null;
+      queuedMiniItem = null;
+      if (selected && document.getElementById("live-mini-stage") === stage) N.startLiveMiniPlayer(selected);
+    }, Math.max(120, Number(delay) || 360));
+    return true;
+  };
+  N.startLiveMiniPlayer = function (item) {
+    var stage = document.getElementById("live-mini-stage");
+    if (!stage || !item || N.playerActive) return false;
+    if (miniItem && N.contentId(miniItem) === N.contentId(item)) return true;
+    N.stopLiveMiniPlayer();
+    miniItem = item;
+    var generation = ++miniGeneration, url = String(N.streamUrl("live", item) || "").trim(), statusNode = document.getElementById("live-mini-status"), titleNode = document.getElementById("live-playing-title");
+    if (titleNode) titleNode.textContent = "Reproduzindo: " + (item.name || "Canal");
+    function valid() { return generation === miniGeneration && document.getElementById("live-mini-stage") === stage; }
+    function setMiniStatus(message) { if (valid() && statusNode) { statusNode.textContent = message || ""; statusNode.hidden = !message; } }
+    if (typeof webapis !== "undefined" && webapis.avplay && typeof webapis.avplay.open === "function") {
+      try {
+        miniAv = webapis.avplay;
+        miniPlane = document.createElement("object");
+        var rect = stage.getBoundingClientRect(), scaleX = 1920 / Math.max(1, window.innerWidth), scaleY = 1080 / Math.max(1, window.innerHeight);
+        miniPlane.type = "application/avplayer";
+        miniPlane.className = "live-mini-plane";
+        stage.insertBefore(miniPlane, stage.firstChild);
+        miniAv.open(url);
+        applyAVBuffer(miniAv, "mini");
+        miniAv.setDisplayRect(Math.round(rect.left * scaleX), Math.round(rect.top * scaleY), Math.round(rect.width * scaleX), Math.round(rect.height * scaleY));
+        miniAv.setListener({
+          onbufferingstart: function () { setMiniStatus("Preparando canal…"); },
+          onbufferingprogress: function (percent) { setMiniStatus("Buffer " + Math.max(0, Math.min(100, Math.round(Number(percent) || 0))) + "%"); },
+          onbufferingcomplete: function () { setMiniStatus(""); },
+          oncurrentplaytime: function () {}, onstreamcompleted: function () {}, onevent: function () {}, onsubtitlechange: function () {}, ondrmevent: function () {},
+          onerror: function () { setMiniStatus("Não foi possível reproduzir a prévia."); }
+        });
+        miniAv.prepareAsync(function () { if (!valid()) return; try { if (miniAv.setDisplayMethod) miniAv.setDisplayMethod("PLAYER_DISPLAY_MODE_LETTER_BOX"); miniAv.play(); setMiniStatus(""); } catch (error) { setMiniStatus("Falha ao iniciar a prévia."); } }, function () { setMiniStatus("Prévia indisponível."); });
+        return true;
+      } catch (error) { N.stopLiveMiniPlayer(); miniItem = item; generation = ++miniGeneration; }
+    }
+    miniVideo = document.createElement("video");
+    miniVideo.className = "live-mini-video";
+    miniVideo.autoplay = true;
+    miniVideo.src = url;
+    stage.insertBefore(miniVideo, stage.firstChild);
+    try { var playing = miniVideo.play(); if (playing && playing.catch) playing.catch(function () { setMiniStatus("Prévia disponível somente na TV."); }); } catch (nativeError) { setMiniStatus("Prévia disponível somente na TV."); }
+    return true;
+  };
   function playbackTime() {
     var position = 0, duration = 0;
     try {
@@ -129,6 +225,7 @@
     }, 3000);
   };
   N.openPlayer = function (kind, item, title, options) {
+    if (N.stopLiveMiniPlayer) N.stopLiveMiniPlayer();
     if (root) N.closePlayer(true);
     playbackGeneration++;
     if (N.focusHistory) N.focusHistory.capture();
@@ -239,10 +336,13 @@
       av = webapis.avplay;
       activePlaybackEngine = "avplay";
       av.open(String(url));
+      applyAVBuffer(av, current.kind);
       av.setDisplayRect(0, 0, 1920, 1080);
       av.setListener({
         onbufferingstart: function () { if (valid()) status("Carregando…"); },
-        onbufferingprogress: function () {},
+        onbufferingprogress: function (percent) {
+          if (valid() && current && current.kind === "live") status("Preparando canal · " + Math.max(0, Math.min(100, Math.round(Number(percent) || 0))) + "%");
+        },
         onbufferingcomplete: function () { if (valid()) status(""); },
         oncurrentplaytime: function () { if (valid()) setProgress(); },
         onstreamcompleted: function () { if (valid()) completed(); },

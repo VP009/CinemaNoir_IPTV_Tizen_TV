@@ -21,7 +21,8 @@
     if (!list.length) return null;
     if (!track._scroller || track._itemCount !== list.length || track._firstItem !== list[0]) {
       var style = getComputedStyle(track), horizontal = track.classList.contains("season-list") || track.classList.contains("horizontal-track");
-      var cols = horizontal ? list.length : Math.max(1, style.gridTemplateColumns === "none" ? 1 : style.gridTemplateColumns.split(/\s+/).length);
+      var template = style.gridTemplateColumns || "none", repeatMatch = /repeat\(\s*(\d+)/.exec(template);
+      var cols = horizontal ? list.length : Math.max(1, template === "none" ? 1 : repeatMatch ? Number(repeatMatch[1]) : template.split(/\s+/).length);
       track._scroller = new N.GridScroller({ track: track, columns: cols, cardHeight: list[0].offsetHeight || 320,
         cardWidth: list[0].offsetWidth || 220, rowGap: parseFloat(style.rowGap || style.gridRowGap) || 0,
         columnGap: parseFloat(style.columnGap || style.gridColumnGap) || 0, safeMargin: 40, totalItems: list.length, currentY: Number(track.dataset.offsetY || 0) });
@@ -55,6 +56,9 @@
     if (!el || !document.documentElement.contains(el)) return false;
     var old = N.activeFocus;
     if (old && old !== el) { old.classList.remove("focused"); old.removeAttribute("data-focused"); }
+    if (document.activeElement && document.activeElement !== el && document.activeElement !== document.body && document.activeElement.blur) {
+      document.activeElement.blur();
+    }
     N.activeFocus = el; el.classList.add("focused"); el.setAttribute("data-focused", "true");
     var track = parent(el), list = track && items(track), scroller = track && bind(track, list), index = track ? list.indexOf(el) : -1;
     if (track && scroller) { N.FocusManager.currentIndex = index; N.FocusManager.columns = scroller.columns; track._lastFocus = el.id; }

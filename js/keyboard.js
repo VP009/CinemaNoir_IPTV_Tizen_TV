@@ -23,6 +23,7 @@
     mode = "letters";
     panel = document.createElement("div");
     panel.className = "keyboard keyboard-floating";
+    if (input.id === "global-search") panel.classList.add("keyboard-below-search");
     panel._initial = input.value;
     document.body.appendChild(panel);
     draw();
@@ -33,6 +34,14 @@
     if (!panel || !field) return;
     var r = field.getBoundingClientRect(),
       useSidePlacement = field.getAttribute("data-search-input") === "true";
+
+    if (field.id === "global-search") {
+      var searchWidth = Math.min(1180, window.innerWidth - 80);
+      panel.style.width = searchWidth + "px";
+      panel.style.left = Math.max(40, (window.innerWidth - searchWidth) / 2) + "px";
+      panel.style.top = Math.max(20, Math.min(window.innerHeight - panel.offsetHeight - 24, r.bottom + 14)) + "px";
+      return;
+    }
 
     if (useSidePlacement) {
       var sideWidth = Math.min(760, Math.max(340, window.innerWidth - r.right - 80));

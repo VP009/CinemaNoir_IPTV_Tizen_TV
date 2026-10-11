@@ -1,7 +1,7 @@
 (function (N) {
   "use strict";
-  var SERIES_ROW_HEIGHT = 352;
-  var CATEGORY_ROW_HEIGHT = 90;
+  var SERIES_ROW_HEIGHT = 346;
+  var CATEGORY_ROW_HEIGHT = 72;
   var EPISODE_ROW_HEIGHT = 120;
 
   function numberAttribute(element, name) {
@@ -51,10 +51,15 @@
     var grid = document.getElementById("catalog");
     var viewport = grid && grid.parentElement || document.querySelector(".grid-scroll");
     if (!viewport || !grid || index < 0) return 0;
-    var columns = grid._scroller && grid._scroller.columns || 6;
+    var first = grid.querySelector ? grid.querySelector(".poster") : null,
+      style = typeof getComputedStyle === "function" ? getComputedStyle(grid) : null,
+      cardHeight = first && first.offsetHeight || 326,
+      gap = style ? parseFloat(style.rowGap || style.gridRowGap) || 20 : 20,
+      rowHeight = cardHeight + gap;
+    var columns = grid._scroller && grid._scroller.columns || (window.innerWidth >= 2300 ? 8 : window.innerWidth >= 1400 ? 7 : 6);
     var row = Math.floor(index / columns);
-    var rowTop = row * SERIES_ROW_HEIGHT;
-    var rowBottom = rowTop + 320;
+    var rowTop = row * rowHeight;
+    var rowBottom = rowTop + cardHeight;
     var currentY = numberAttribute(grid, "data-offset-y");
     var safeMargin = 40;
     var newY = currentY;
@@ -70,8 +75,13 @@
     var list = document.getElementById("categories");
     var viewport = list && list.parentElement || document.querySelector(".category-scroll");
     if (!viewport || !list || index < 0) return 0;
-    var itemTop = index * CATEGORY_ROW_HEIGHT;
-    var itemBottom = itemTop + 76;
+    var first = list.querySelector ? list.querySelector(".category-item") : null,
+      style = typeof getComputedStyle === "function" ? getComputedStyle(first || list) : null,
+      itemHeight = first && first.offsetHeight || 62,
+      gap = style ? parseFloat(style.marginBottom) || 10 : 10,
+      rowHeight = itemHeight + gap;
+    var itemTop = index * rowHeight;
+    var itemBottom = itemTop + itemHeight;
     var currentY = numberAttribute(list, "data-offset-y");
     var safeMargin = 30;
     var newY = currentY;
@@ -87,8 +97,13 @@
     var list = document.getElementById("episodes");
     var viewport = list && list.parentElement || document.querySelector(".episode-scroll");
     if (!viewport || !list || index < 0) return 0;
-    var itemTop = index * EPISODE_ROW_HEIGHT;
-    var itemBottom = itemTop + 104;
+    var first = list.querySelector ? list.querySelector(".episode") : null,
+      style = typeof getComputedStyle === "function" ? getComputedStyle(list) : null,
+      itemHeight = first && first.offsetHeight || 104,
+      gap = style ? parseFloat(style.rowGap || style.gridRowGap) || 16 : 16,
+      rowHeight = itemHeight + gap;
+    var itemTop = index * rowHeight;
+    var itemBottom = itemTop + itemHeight;
     var currentY = numberAttribute(list, "data-offset-y");
     var safeMargin = 28;
     var newY = currentY;

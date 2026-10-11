@@ -6,16 +6,27 @@
     origin,
     seekHold = null,
     navigationTimes = [],
-    fastNavigationTimer = null;
+    fastNavigationTimer = null,
+    navigationTimer = null,
+    pendingNavigationCode = 0,
+    lastNavigationAt = 0;
+  N.redCode = 403;
+  N.greenCode = 404;
   N.yellowCode = 405;
   N.blueCode = 406;
   N.initRemoteKeys = function () {
     if (typeof tizen === "undefined" || !tizen.tvinputdevice) return;
     try {
+      tizen.tvinputdevice.registerKey("ColorF0Red");
+      tizen.tvinputdevice.registerKey("ColorF1Green");
       tizen.tvinputdevice.registerKey("ColorF2Yellow");
       tizen.tvinputdevice.registerKey("ColorF3Blue");
+      var red = tizen.tvinputdevice.getKey("ColorF0Red");
+      var green = tizen.tvinputdevice.getKey("ColorF1Green");
       var yellow = tizen.tvinputdevice.getKey("ColorF2Yellow");
       var blue = tizen.tvinputdevice.getKey("ColorF3Blue");
+      if (red) N.redCode = red.code;
+      if (green) N.greenCode = green.code;
       if (yellow) N.yellowCode = yellow.code;
       if (blue) N.blueCode = blue.code;
     } catch (error) {
@@ -31,7 +42,17 @@
       N.rememberFocus();
       N.focus(input);
       N.openKeyboard(input);
+    } else if (N.shortcutRoute) {
+      N.shortcutRoute("search");
     }
+  }
+  function runColorShortcut(color, el) {
+    var action = N.shortcutAction ? N.shortcutAction(color).id : ({ red: "continue", green: "settings", yellow: "favorite", blue: "search" })[color];
+    if (action === "favorite") {
+      if (el && el._favorite) favoriteShortcut(el);
+      else if (N.toast) N.toast("Selecione um canal, filme ou série para favoritar.");
+    } else if (action === "search") searchShortcut();
+    else if (N.shortcutRoute) N.shortcutRoute(action);
   }
   function resetSeekHold(commit) {
     if (seekHold && seekHold.timer) {
@@ -53,9 +74,33 @@
       navigationTimes = [];
     }, 130);
   }
+  function flushNavigation() {
+    var code = pendingNavigationCode;
+    navigationTimer = null;
+    pendingNavigationCode = 0;
+    if (!code) return;
+    lastNavigationAt = Date.now();
+    N.moveFocus(code);
+  }
+  function scheduleNavigation(code) {
+    var isTizen = typeof tizen !== "undefined", elapsed, delay;
+    if (!isTizen) { N.moveFocus(code); return; }
+    pendingNavigationCode = code;
+    if (navigationTimer) return;
+    elapsed = Date.now() - lastNavigationAt;
+    delay = Math.max(0, 46 - elapsed);
+    if (!delay && window.requestAnimationFrame) navigationTimer = window.requestAnimationFrame(flushNavigation);
+    else navigationTimer = setTimeout(flushNavigation, delay);
+  }
   N.RemoteNavigation = window.RemoteNavigation = { init: function () { N.initRemoteKeys(); } };
   N.cancelPress = function () {
     clearTimeout(timer);
+    if (navigationTimer) {
+      if (window.cancelAnimationFrame) window.cancelAnimationFrame(navigationTimer);
+      clearTimeout(navigationTimer);
+    }
+    navigationTimer = null;
+    pendingNavigationCode = 0;
     pressed = false;
     longDone = false;
     origin = null;
@@ -65,14 +110,10 @@
     var code = e.keyCode || ({ArrowLeft:37, ArrowUp:38, ArrowRight:39, ArrowDown:40, Enter:13, Escape:27})[e.key],
       el = N.getFocused();
     if (N.playerActive) N.playerActivity();
-    if (code === N.yellowCode && !document.querySelector(".tv-modal,.keyboard")) {
+    var color = code === N.redCode ? "red" : code === N.greenCode ? "green" : code === N.yellowCode ? "yellow" : code === N.blueCode ? "blue" : "";
+    if (color && !document.querySelector(".tv-modal,.keyboard") && !N.playerActive) {
       e.preventDefault();
-      favoriteShortcut(el);
-      return;
-    }
-    if (code === N.blueCode && !document.querySelector(".tv-modal,.keyboard") && !N.playerActive) {
-      e.preventDefault();
-      searchShortcut();
+      runColorShortcut(color, el);
       return;
     }
     if (
@@ -115,7 +156,7 @@
         }
         return;
       }
-      N.moveFocus(code);
+      scheduleNavigation(code);
       return;
     }
     if (code !== 13) return;

@@ -57,6 +57,7 @@
     var currentSession = session, code = randomCode(), token = randomHex(24), api = baseUrl() + "/api/pair";
     function active() { return currentSession === session && !!document.querySelector(".home-pairing"); }
     function acknowledge(command, status, message) {
+      var firstLogin = !!document.getElementById("save") && !document.querySelector(".home-page");
       request("POST", api, { action: "ack", code: code, token: token, commandId: command.id, status: status, message: message, device: deviceState() }, function () {
         processing = false;
         if (!active()) return;
@@ -65,6 +66,11 @@
           var activeName = document.querySelector(".home-intro p");
           if (activeName && N.active) activeName.textContent = N.active.name;
           N.toast(message);
+          if (firstLogin && N.active) {
+            if (N.shortcutRoute) N.shortcutRoute("home");
+            else { location.hash = "#/home"; if (N.render) N.render(); }
+            return;
+          }
           if (!N.active) N.render();
         }
       });

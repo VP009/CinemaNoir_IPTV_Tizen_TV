@@ -5,7 +5,7 @@
 		if (!debug) {
 			debug = document.createElement("div");
 			debug.id = "debug-error";
-			debug.style.cssText = "position:fixed;left:20px;bottom:20px;max-width:1500px;background:#7f1d1d;color:#fff;padding:18px;font-size:22px;z-index:999999";
+			debug.className = "debug-error";
 			document.body.appendChild(debug);
 		}
 		debug.innerHTML = "ERRO: " + message + "<br>ARQUIVO: " + source + "<br>LINHA: " + line + "<br>COLUNA: " + column;
@@ -16,6 +16,7 @@
 	function startApplication() {
 		try {
 			if (typeof tizen !== "undefined" && tizen.tvinputdevice) {
+				document.documentElement.classList.add("tizen-device");
 				["MediaPlay", "MediaPause", "MediaFastForward", "MediaRewind", "MediaStop"].forEach(function (key) {
 					try {
 						tizen.tvinputdevice.registerKey(key);

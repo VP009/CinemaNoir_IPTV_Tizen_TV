@@ -14,10 +14,14 @@
     if (persistTimer) clearTimeout(persistTimer);
     persistTimer = setTimeout(persist, 120);
   }
-  function findParentByClass(element, className) {
+  function findTrack(element) {
     var current = element;
     while (current) {
-      if (current.classList && current.classList.contains(className)) return current;
+      if (current.classList && (
+        current.classList.contains("media-grid") || current.classList.contains("category-list") ||
+        current.classList.contains("episode-grid") || current.classList.contains("season-list") ||
+        current.classList.contains("vertical-track") || current.classList.contains("horizontal-track")
+      )) return current;
       current = current.parentNode;
     }
     return null;
@@ -32,7 +36,7 @@
     get: function (page) { return pages[storageKey(page)] || {}; },
     patch: function (page, patch) { var k = storageKey(page); pages[k] = Object.assign({}, pages[k] || {}, patch || {}); persistSoon(); return pages[k]; },
     capture: function (page) {
-      var el = N.getFocused ? N.getFocused() : document.activeElement, track = el && (findParentByClass(el, "media-grid") || findParentByClass(el, "category-list") || findParentByClass(el, "episode-grid") || findParentByClass(el, "season-list") || findParentByClass(el, "vertical-track") || findParentByClass(el, "horizontal-track"));
+      var el = N.getFocused ? N.getFocused() : document.activeElement, track = el && findTrack(el);
       var patch = { focusKey: el && el.id || null, region: track && (track.dataset.region || track.id) || null };
       if (track) Object.assign(patch, offsets(track));
       if (track && track.dataset.region === "categories") patch.categoryOffsetY = Number(track.dataset.offsetY || 0);
@@ -45,7 +49,7 @@
     },
     save: function (el) {
       if (!el) return;
-      var track = (findParentByClass(el, "media-grid") || findParentByClass(el, "category-list") || findParentByClass(el, "episode-grid") || findParentByClass(el, "season-list") || findParentByClass(el, "vertical-track") || findParentByClass(el, "horizontal-track")), patch = { focusKey: el.id || null, region: track && (track.dataset.region || track.id) || null };
+      var track = findTrack(el), patch = { focusKey: el.id || null, region: track && (track.dataset.region || track.id) || null };
       if (track) Object.assign(patch, offsets(track));
       if (track && track.dataset.region === "categories") patch.categoryOffsetY = Number(track.dataset.offsetY || 0);
       if (track && track.dataset.region === "channels") patch.channelOffsetY = Number(track.dataset.offsetY || 0);

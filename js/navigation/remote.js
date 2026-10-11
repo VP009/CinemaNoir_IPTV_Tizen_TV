@@ -64,6 +64,7 @@
   }
   function markNavigationSpeed() {
     var now = Date.now(), recent = [], i;
+    if (N.setNavigationBusy) N.setNavigationBusy(true);
     for (i = 0; i < navigationTimes.length; i += 1) if (now - navigationTimes[i] < 220) recent.push(navigationTimes[i]);
     recent.push(now);
     navigationTimes = recent;
@@ -72,7 +73,8 @@
     fastNavigationTimer = setTimeout(function () {
       document.documentElement.classList.remove("fast-navigation");
       navigationTimes = [];
-    }, 130);
+      if (N.setNavigationBusy) N.setNavigationBusy(false);
+    }, 180);
   }
   function flushNavigation() {
     var code = pendingNavigationCode;

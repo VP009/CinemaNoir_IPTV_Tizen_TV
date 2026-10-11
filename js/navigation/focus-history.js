@@ -12,7 +12,7 @@
   }
   function persistSoon() {
     if (persistTimer) clearTimeout(persistTimer);
-    persistTimer = setTimeout(persist, 120);
+    persistTimer = setTimeout(persist, 500);
   }
   function findTrack(element) {
     var current = element;

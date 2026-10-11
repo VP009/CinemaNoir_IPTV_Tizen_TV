@@ -1,7 +1,8 @@
 (function (N) {
   "use strict";
   var PREFIX = "noir:cache:", IMAGE_META = "noir:image-cache-meta", imageQueue = [], imageActive = 0,
-    imageGeneration = 0, imageMemory = {}, imageOrder = [], activeLoads = [], MAX_ACTIVE = 3, MAX_OBJECT_URLS = 72;
+    imageGeneration = 0, imageMemory = {}, imageOrder = [], activeLoads = [], MAX_ACTIVE = typeof tizen !== "undefined" ? 2 : 3, MAX_OBJECT_URLS = 72,
+    imageMeta = null, imageMetaTimer = null, navigationBusy = false, searchGeneration = 0;
 
   function readJson(key, fallback) { try { var raw = localStorage.getItem(key); return raw === null ? fallback : JSON.parse(raw); } catch (e) { return fallback; } }
   function writeJson(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch (e) { return false; } }
@@ -27,8 +28,9 @@
           if (!value || Number(value.updatedAt || 0) < (value && value.completed ? completedLimit : progressLimit)) { localStorage.removeItem(key); removed += 1; }
         }
       }
-      var meta = readJson(IMAGE_META, {}), urls = Object.keys(meta).sort(function (a, b) { return Number(meta[b]) - Number(meta[a]); });
+      var meta = imageMeta || readJson(IMAGE_META, {}), urls = Object.keys(meta).sort(function (a, b) { return Number(meta[b]) - Number(meta[a]); });
       if (urls.length > 220) { urls.slice(220).forEach(function (url) { delete meta[url]; }); writeJson(IMAGE_META, meta); }
+      imageMeta = meta;
       try {
         if (window.caches && urls.length > 220) caches.open("cinema-noir-images-v1").then(function (cache) { urls.slice(220).forEach(function (url) { cache.delete(url); }); });
       } catch (ignoreCacheCleanup) {}
@@ -42,7 +44,17 @@
     while (imageOrder.length > MAX_OBJECT_URLS) { var old = imageOrder.shift(), value = imageMemory[old]; delete imageMemory[old]; try { URL.revokeObjectURL(value); } catch (e) {} }
     return objectUrl;
   }
-  function markImage(source) { var meta = readJson(IMAGE_META, {}); meta[source] = Date.now(); var keys = Object.keys(meta); if (keys.length > 240) keys.sort(function (a, b) { return meta[b] - meta[a]; }).slice(220).forEach(function (key) { delete meta[key]; }); writeJson(IMAGE_META, meta); }
+  function flushImageMeta() {
+    if (imageMetaTimer) { clearTimeout(imageMetaTimer); imageMetaTimer = null; }
+    if (imageMeta) writeJson(IMAGE_META, imageMeta);
+  }
+  function markImage(source) {
+    imageMeta = imageMeta || readJson(IMAGE_META, {}); imageMeta[source] = Date.now();
+    var keys = Object.keys(imageMeta);
+    if (keys.length > 240) keys.sort(function (a, b) { return imageMeta[b] - imageMeta[a]; }).slice(220).forEach(function (key) { delete imageMeta[key]; });
+    if (imageMetaTimer) clearTimeout(imageMetaTimer);
+    imageMetaTimer = setTimeout(flushImageMeta, 1200);
+  }
   function cachedImage(source, done) {
     if (imageMemory[source]) return done(imageMemory[source]);
     try {
@@ -61,6 +73,7 @@
     } catch (e) {}
   }
   function pumpImages() {
+    if (navigationBusy) return;
     while (imageActive < MAX_ACTIVE && imageQueue.length) {
       (function (job) {
         if (!job.element || !document.documentElement.contains(job.element) || job.generation !== imageGeneration) return;
@@ -84,5 +97,29 @@
     for (i = 0; i < images.length; i += 1) if (images[i].dataset.src) imageQueue.push({ element: images[i], source: images[i].dataset.src, generation: generation });
     pumpImages();
   };
+  N.setNavigationBusy = function (busy) { navigationBusy = !!busy; if (!navigationBusy) pumpImages(); };
+  function normalizeSearch(value) {
+    value = String(value || "").toLowerCase();
+    return value.normalize ? value.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : value;
+  }
+  N.catalogSearchText = function (item) {
+    if (!item) return "";
+    if (item.__noirSearchText !== undefined) return item.__noirSearchText;
+    var value = normalizeSearch(item.name || item.title);
+    try { Object.defineProperty(item, "__noirSearchText", { value: value, writable: true, configurable: true }); }
+    catch (e) { item.__noirSearchText = value; }
+    return value;
+  };
+  N.prepareCatalogSearchIndex = function (items) {
+    var generation = ++searchGeneration, index = 0, list = items || [];
+    function step() {
+      if (generation !== searchGeneration) return;
+      var end = Math.min(list.length, index + 160);
+      while (index < end) { N.catalogSearchText(list[index]); index += 1; }
+      if (index < list.length) setTimeout(step, 16);
+    }
+    setTimeout(step, 80);
+  };
   N.cleanupOldData = function () { return N.PersistentCache.cleanup(); };
+  window.addEventListener("pagehide", flushImageMeta);
 })(window.Noir || (window.Noir = {}));

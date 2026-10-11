@@ -1,6 +1,6 @@
 (function (N) {
   "use strict";
-  var app = null, currentItems = [], liveEpgTimer = null, liveEpgToken = 0;
+  var app = null, currentItems = [], liveEpgTimer = null, liveEpgToken = 0, liveEpgRequest = null;
   function getApp() {
     if (!app) app = document.getElementById("app");
     if (!app) throw new Error("Elemento app não encontrado após o carregamento da página.");
@@ -33,11 +33,14 @@
     if (!preview || !item) return;
     if (name) name.textContent = item.name || "Canal";
     if (logo) logo.src = item.stream_icon || "assets/fallback.svg";
-    if (epg) epg.innerHTML = '<div class="epg-loading">Carregando programação…</div>';
     clearTimeout(liveEpgTimer);
+    if (liveEpgRequest && liveEpgRequest.abort) liveEpgRequest.abort();
+    liveEpgRequest = null;
     var token = ++liveEpgToken;
     liveEpgTimer = setTimeout(function () {
-      N.epg(item, 5).then(function (list) {
+      if (epg) epg.classList.add("epg-stale");
+      liveEpgRequest = N.epg(item, 5);
+      liveEpgRequest.then(function (list) {
         if (token !== liveEpgToken || !document.getElementById("live-epg")) return;
         var now = Date.now() / 1000, future = list.filter(function (entry) { return !entry.stop_timestamp || Number(entry.stop_timestamp) >= now; }).slice(0, 4);
         if (!future.length) future = list.slice(0, 4);
@@ -45,8 +48,9 @@
           var title = decodeEpgText(entry.title) || "Programa sem título", description = decodeEpgText(entry.description);
           return '<div class="epg-item' + (index === 0 ? " epg-now" : "") + '"><span>' + (index === 0 ? "Agora" : epgTime(entry.start_timestamp, entry.start)) + '</span><div><strong>' + esc(title) + '</strong>' + (description ? '<small>' + esc(description) + '</small>' : "") + "</div></div>";
         }).join("") || '<div class="epg-empty">Programação não disponível.</div>';
-      }).catch(function () { if (token === liveEpgToken && epg) epg.innerHTML = '<div class="epg-empty">Programação não disponível.</div>'; });
-    }, 180);
+        epg.classList.remove("epg-stale"); liveEpgRequest = null;
+      }).catch(function (error) { if (token === liveEpgToken && epg && (!error || error.message !== "cancelled")) { epg.classList.remove("epg-stale"); epg.innerHTML = '<div class="epg-empty">Programação não disponível.</div>'; } });
+    }, 480);
   }
   function buildEpisodeOptions(seriesItem, seasons, episode, requestedSeason) {
     seasons = seasons || {};
@@ -112,6 +116,9 @@
   function page(body, showHeader, viewportClass) {
     if (N.stopPairing) N.stopPairing();
     if (N.stopLiveMiniPlayer) N.stopLiveMiniPlayer();
+    clearTimeout(liveEpgTimer); liveEpgTimer = null; liveEpgToken += 1;
+    if (liveEpgRequest && liveEpgRequest.abort) liveEpgRequest.abort();
+    liveEpgRequest = null;
     getApp().innerHTML =
       (showHeader ? header() : "") +
       '<div class="viewport ' +
@@ -292,6 +299,7 @@
     Promise.all([N.catalog(kind), N.categories(kind)])
       .then(function (results) {
         currentItems = results[0];
+        if (N.prepareCatalogSearchIndex) N.prepareCatalogSearchIndex(currentItems);
         var categories = [
           { category_id: "", category_name: "Todos" },
           {
@@ -381,7 +389,7 @@
         if (kind === "live" && currentItems.length) {
           var initialLiveId = String(state.selectedChannelId || state.focusedChannelId || ""), initialLive = currentItems.filter(function (item) { return N.contentId(item) === initialLiveId; })[0] || currentItems[0];
           showLiveSelection(initialLive);
-          if (N.queueLiveMiniPlayer) N.queueLiveMiniPlayer(initialLive, 180);
+          if (N.queueLiveMiniPlayer) N.queueLiveMiniPlayer(initialLive, 420);
         }
         wireCommon();
         restore();
@@ -417,7 +425,7 @@
   function drawCatalog(kind, items, query, category) {
     var q = normalize(query), lookup = catalogLookup(kind),
       all = items.filter(function (i) {
-        var match = !q || normalize(i.name || i.title).indexOf(q) >= 0;
+        var match = !q || (N.catalogSearchText ? N.catalogSearchText(i) : normalize(i.name || i.title)).indexOf(q) >= 0;
         if (q) return match;
         if (category === "__favorites") return !!lookup.favorites[kind + ":" + N.contentId(i)];
         if (category === "__continue") return !!lookup.progress[N.contentId(i)];
@@ -429,8 +437,8 @@
       initialIndex = previousSignature === signature ? Number(root.dataset.lastIndex || 0) : Number(N.focusHistory.get(kind).itemIndex || 0),
       columns = kind === "live" ? 1 : window.innerWidth >= 2300 ? 8 : window.innerWidth >= 1400 ? 7 : 6,
       rowHeight = kind === "live" ? 112 : window.innerWidth < 1400 || window.innerHeight < 800 ? 266 : 346,
-      windowRows = kind === "live" ? 13 : 7,
-      beforeRows = kind === "live" ? 5 : 3;
+      windowRows = kind === "live" ? 15 : 9,
+      beforeRows = kind === "live" ? 6 : 4;
     root._renderVersion = Number(root._renderVersion || 0) + 1;
     function catalogItemId(item) {
       return (kind === "series" ? "SERIES_" : kind === "live" ? "CHANNEL_" : "MOVIE_") + N.contentId(item);
@@ -453,31 +461,34 @@
     root.className = "media-grid";
     root._scroller = null;
     root.dataset.region = kind === "live" ? "channels" : kind + "-grid";
+    function onCatalogClick() {
+      var item = this._catalogItem;
+      N.focusHistory.capture(kind);
+      if (kind === "live") N.focusHistory.patch(kind, { selectedChannelId: N.contentId(item), focusedChannelId: N.contentId(item) });
+      open(kind, item);
+    }
+    function onCatalogFocus() {
+      var item = this._catalogItem, focusedIndex = Number(this.dataset.index);
+      root.dataset.lastIndex = this.dataset.index;
+      if (kind === "live") {
+        N.focusHistory.patch(kind, { focusedChannelId: N.contentId(item), channelIndex: focusedIndex });
+        showLiveSelection(item);
+        if (N.queueLiveMiniPlayer) N.queueLiveMiniPlayer(item, 520);
+      }
+    }
+    function onCatalogFavorite() {
+      var item = this._catalogItem, focusedIndex = Number(this.dataset.index || 0);
+      N.favorite(kind, item);
+      N.toast(N.isFavorite(kind, item) ? "★ Adicionado aos favoritos" : "Removido dos favoritos");
+      drawCatalog(kind, items, query, category);
+      if (root._focusVirtualIndex) root._focusVirtualIndex(focusedIndex);
+    }
     function wireCatalogItems(batch, startIndex) {
       batch.forEach(function (item, relativeIndex) {
         var id = catalogItemId(item), b = document.getElementById(id);
         if (!b) return;
         b.dataset.index = String(startIndex + relativeIndex);
-        b.onclick = function () {
-          N.focusHistory.capture(kind);
-          if (kind === "live") N.focusHistory.patch(kind, { selectedChannelId: N.contentId(item), focusedChannelId: N.contentId(item) });
-          open(kind, item);
-        };
-        b.onfocus = function () {
-          var focusedIndex = Number(this.dataset.index);
-          root.dataset.lastIndex = this.dataset.index;
-          if (kind === "live") {
-            N.focusHistory.patch(kind, { focusedChannelId: N.contentId(item), channelIndex: focusedIndex });
-            showLiveSelection(item);
-            if (N.queueLiveMiniPlayer) N.queueLiveMiniPlayer(item, 360);
-          }
-        };
-        b._favorite = function () {
-          N.favorite(kind, item);
-          N.toast(N.isFavorite(kind, item) ? "★ Adicionado aos favoritos" : "Removido dos favoritos");
-          drawCatalog(kind, items, query, category);
-          if (root._focusVirtualIndex) root._focusVirtualIndex(Number(b.dataset.index || 0));
-        };
+        b._catalogItem = item; b.onclick = onCatalogClick; b.onfocus = onCatalogFocus; b._favorite = onCatalogFavorite;
       });
     }
     function renderWindow(centerIndex) {
@@ -792,13 +803,13 @@
   }
   function settings() {
     var liveBufferSeconds = N.Settings.get("liveBufferSeconds"),
-      vodBufferSeconds = N.Settings.get("vodBufferSeconds"), currentTheme = N.Settings.get("theme");
+      vodBufferSeconds = N.Settings.get("vodBufferSeconds"), currentTheme = N.Settings.get("theme"), currentPerformance = N.Settings.get("performanceMode");
     var themeMarkup = N.ThemeCatalog.map(function (theme) {
       var colors = theme.colors;
       return '<button class="theme-choice" data-theme-choice="' + theme.id + '"><span class="theme-preview preview-' + theme.id + '" style="--preview-bg:' + colors.background + ';--preview-surface:' + colors.surface + ';--preview-primary:' + colors.primary + ';--preview-focus:' + colors.focus + '"><i></i><i></i><i></i></span><span class="theme-copy"><strong>' + theme.name + '</strong><small>' + theme.description + '</small></span></button>';
     }).join("");
     page(
-      '<div class="settings-page"><div class="toolbar"><h1>Configurações</h1></div><div class="settings-columns"><div class="settings-lists"><div class="panel"><button id="add">' + icon("plus") + ' Adicionar lista</button><div id="profiles"></div><div class="shortcut-settings"><h2>Atalhos coloridos</h2><p>Pressione OK para trocar a função.</p><div class="shortcut-config-grid">' + shortcutConfigMarkup() + '</div></div></div></div><div class="settings-options"><div class="panel playback-settings"><h2>Buffer de reprodução</h2><div class="buffer-option"><h3>TV ao vivo</h3><p>O mínimo é 1 minuto e a mudança vale ao abrir o próximo canal.</p><div class="buffer-setting"><button id="buffer-minus" aria-label="Diminuir buffer da TV ao vivo">− 30s</button><strong id="live-buffer-value"></strong><button id="buffer-plus" aria-label="Aumentar buffer da TV ao vivo">+ 30s</button></div><small>Intervalo: 60 a 300 segundos.</small></div><div class="buffer-option"><h3>Filmes e séries</h3><p>Controla o buffer inicial e a recuperação após interrupções.</p><div class="buffer-setting"><button id="vod-buffer-minus" aria-label="Diminuir buffer de filmes e séries">− 5s</button><strong id="vod-buffer-value"></strong><button id="vod-buffer-plus" aria-label="Aumentar buffer de filmes e séries">+ 5s</button></div><small>Intervalo: 5 a 120 segundos.</small></div><div class="update-setting"><span><b>Aplicativo v' + esc(N.APP_VERSION || "1.0.0") + '</b><small>Atualizações automáticas pela Samsung Apps TV.</small></span><button id="check-update">Verificar</button></div></div><div class="panel theme-settings"><div class="theme-heading"><span><h2>Temas</h2><p>Escolha com ↑ e ↓. A prévia é aplicada imediatamente.</p></span><strong id="theme-position"></strong></div><div class="theme-scroll"><div id="theme-track" class="theme-switch vertical-track" data-region="themes">' + themeMarkup + '</div></div><div class="theme-scroll-hint">↑ ↓ Navegar · OK Aplicar</div></div></div></div></div>',
+      '<div class="settings-page"><div class="toolbar"><h1>Configurações</h1></div><div class="settings-columns"><div class="settings-lists"><div class="panel"><button id="add">' + icon("plus") + ' Adicionar lista</button><div id="profiles"></div><div class="shortcut-settings"><h2>Atalhos coloridos</h2><p>Pressione OK para trocar a função.</p><div class="shortcut-config-grid">' + shortcutConfigMarkup() + '</div></div></div></div><div class="settings-options"><div class="panel playback-settings"><h2>Buffer de reprodução</h2><div class="buffer-option"><h3>TV ao vivo</h3><p>O mínimo é 1 minuto e a mudança vale ao abrir o próximo canal.</p><div class="buffer-setting"><button id="buffer-minus" aria-label="Diminuir buffer da TV ao vivo">− 30s</button><strong id="live-buffer-value"></strong><button id="buffer-plus" aria-label="Aumentar buffer da TV ao vivo">+ 30s</button></div><small>Intervalo: 60 a 300 segundos.</small></div><div class="buffer-option"><h3>Filmes e séries</h3><p>Controla o buffer inicial e a recuperação após interrupções.</p><div class="buffer-setting"><button id="vod-buffer-minus" aria-label="Diminuir buffer de filmes e séries">− 5s</button><strong id="vod-buffer-value"></strong><button id="vod-buffer-plus" aria-label="Aumentar buffer de filmes e séries">+ 5s</button></div><small>Intervalo: 5 a 120 segundos.</small></div><div class="performance-setting"><h3>Desempenho da interface</h3><p>Automático usa o modo rápido na TV e mantém os efeitos completos no navegador.</p><div class="performance-choices"><button data-performance-choice="auto">Automático</button><button data-performance-choice="speed">Máxima fluidez</button><button data-performance-choice="quality">Visual completo</button></div></div><div class="update-setting"><span><b>Aplicativo v' + esc(N.APP_VERSION || "1.0.0") + '</b><small>Atualizações automáticas pela Samsung Apps TV.</small></span><button id="check-update">Verificar</button></div></div><div class="panel theme-settings"><div class="theme-heading"><span><h2>Temas</h2><p>Escolha com ↑ e ↓. A prévia é aplicada imediatamente.</p></span><strong id="theme-position"></strong></div><div class="theme-scroll"><div id="theme-track" class="theme-switch vertical-track" data-region="themes">' + themeMarkup + '</div></div><div class="theme-scroll-hint">↑ ↓ Navegar · OK Aplicar</div></div></div></div></div>',
       false,
       "settings-viewport",
     );
@@ -827,6 +838,17 @@
       N.toast("Buffer de filmes e séries: " + vodBufferSeconds + " segundos.");
     };
     showBufferValue();
+    function updatePerformanceButtons() {
+      document.querySelectorAll("[data-performance-choice]").forEach(function (button) { button.dataset.selected = String(button.dataset.performanceChoice === currentPerformance); });
+    }
+    document.querySelectorAll("[data-performance-choice]").forEach(function (button) {
+      button.onclick = function () {
+        currentPerformance = N.Settings.set("performanceMode", this.dataset.performanceChoice);
+        N.applyPerformanceMode(); updatePerformanceButtons(); N.focus(this);
+        N.toast(currentPerformance === "speed" ? "Máxima fluidez ativada." : currentPerformance === "quality" ? "Visual completo ativado." : "Desempenho automático ativado.");
+      };
+    });
+    updatePerformanceButtons();
     document.getElementById("check-update").onclick = function () { N.checkForUpdates(true); };
     document.querySelectorAll("[data-shortcut-color]").forEach(function (button) {
       button.onclick = function () {

@@ -894,6 +894,16 @@ html.tizen-device.fast-navigation .title-marquee.is-overflowing{
   animation:none!important;
   transform:translate3d(0,0,0)!important;
 }
+html.tizen-device .poster.focused .title-marquee.is-overflowing,html.tizen-device .poster[data-focused="true"] .title-marquee.is-overflowing{-webkit-animation-delay:600ms;animation-delay:600ms}
+html[data-performance="speed"] .series-backdrop{filter:none!important;opacity:.2}
+html[data-performance="speed"] .panel,html[data-performance="speed"] .live-preview,html[data-performance="speed"] .poster,html[data-performance="speed"] .home-card{box-shadow:none!important}
+html[data-performance="speed"] .progressive-image{transition:none!important}
+html[data-performance="speed"].fast-navigation .title-marquee.is-overflowing{-webkit-animation:none!important;animation:none!important}
+.epg-stale{opacity:.62}
+.performance-setting{margin-top:14px;padding-top:12px;border-top:1px solid var(--theme-border-soft)}
+.performance-setting h3,.performance-setting p{margin:0 0 8px}.performance-setting p{font-size:14px;color:var(--text-secondary)}
+.performance-choices{display:-webkit-flex;display:flex;gap:8px}.performance-choices button{min-width:0;-webkit-flex:1 1 0;flex:1 1 0;padding:10px 8px;text-align:center;font-size:14px}
+.performance-choices button[data-selected="true"]{border-color:var(--theme-accent);background:var(--theme-accent-soft);color:var(--theme-focus-text)}
 
 /* Atalhos coloridos do controle: legenda exclusiva da home e configuração compacta. */
 .home-shortcuts{

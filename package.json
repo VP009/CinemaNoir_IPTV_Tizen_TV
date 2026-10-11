@@ -1,9 +1,10 @@
 {
   "name": "cinema-noir-pairing",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "private": true,
   "scripts": {
-    "build": "node scripts/build-pair-site.cjs"
+    "build": "node scripts/build-pair-site.cjs",
+    "test": "node tests/tizen-regression.cjs && node tests/pair-api.cjs && node tests/performance-regression.cjs"
   },
   "dependencies": {
     "@upstash/ratelimit": "^2.0.7",

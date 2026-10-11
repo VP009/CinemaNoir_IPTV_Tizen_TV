@@ -9,23 +9,39 @@
   N.cancel = function () { N.generation++; N.requests.slice().forEach(function (xhr) { xhr.abort(); }); N.requests = []; };
   N.activate = function (id) { N.cancel(); N.active = N.profiles.filter(function (p) { return p.id === id && p.enabled !== false; })[0] || null; if (N.active) { N.active.lastUsedAt = new Date().toISOString(); N.write('profiles', N.profiles); N.write('active', id); } };
   N.request = function (profile, action, params) {
-    return new Promise(function (resolve, reject) {
-      var xhr = new XMLHttpRequest(), generation = N.generation;
+    var xhr = null, finished = false, promise = new Promise(function (resolve, reject) {
+      xhr = new XMLHttpRequest(); var generation = N.generation;
     var serverBase = 'http://' + String(profile.baseUrl || '').replace(/^https?:\/\//i, '').replace(/\/+$/, '');
     var url = serverBase + '/player_api.php?username=' + encodeURIComponent(profile.username) + '&password=' + encodeURIComponent(profile.password);
       if (action) url += '&action=' + encodeURIComponent(action);
       Object.keys(params || {}).forEach(function (key) { url += '&' + encodeURIComponent(key) + '=' + encodeURIComponent(params[key]); });
       N.requests.push(xhr); xhr.open('GET', url, true); xhr.timeout = 15000;
-      function finish(error, data) { var i = N.requests.indexOf(xhr); if (i >= 0) N.requests.splice(i, 1); if (generation !== N.generation) return reject(new Error('cancelled')); if (error) reject(new Error(error)); else resolve(data); }
+      function finish(error, data) { if (finished) return; finished = true; var i = N.requests.indexOf(xhr); if (i >= 0) N.requests.splice(i, 1); if (generation !== N.generation) return reject(new Error('cancelled')); if (error) reject(new Error(error)); else resolve(data); }
       xhr.onload = function () { if (xhr.status === 401 || xhr.status === 403) return finish('Usuário ou senha inválidos.'); if (xhr.status < 200 || xhr.status >= 300) return finish('Servidor indisponível (HTTP ' + xhr.status + ').'); try { finish(null, JSON.parse(xhr.responseText)); } catch (e) { finish('O servidor retornou uma resposta inválida.'); } };
       xhr.onerror = function () { finish('Não foi possível conectar. Verifique a rede, a URL, o certificado e a permissão CORS do servidor.'); };
       xhr.ontimeout = function () { finish('Tempo de conexão esgotado. Tente novamente.'); }; xhr.onabort = function () { finish('cancelled'); }; xhr.send();
     });
+    promise.abort = function () { if (!finished && xhr) { try { xhr.abort(); } catch (e) {} } };
+    return promise;
   };
   N.authenticate = function (p) { return N.request(p).then(function (data) { if (!data.user_info || Number(data.user_info.auth) !== 1) throw new Error('Usuário ou senha inválidos.'); if (data.user_info.status && data.user_info.status !== 'Active') throw new Error('Lista inativa: ' + data.user_info.status); p.account = data.user_info; return p; }); };
   N.catalog = function (kind) { var key = N.key('cache', kind), cached = N.cache[key]; if (cached && Date.now() - cached.time < 300000) return Promise.resolve(cached.data); var actions = {live:'get_live_streams',movies:'get_vod_streams',series:'get_series'}; return N.request(N.active, actions[kind]).then(function (data) { if (!Array.isArray(data)) throw new Error('Catálogo inválido.'); N.cache[key] = {time:Date.now(),data:data}; return data; }); };
   N.categories = function (kind) { var key = N.key('cache', 'categories:' + kind), cached = N.cache[key], stored = N.PersistentCache && N.PersistentCache.get(key); if (cached && Date.now() - cached.time < 300000) return Promise.resolve(cached.data); if (stored) { N.cache[key] = {time:Date.now(),data:stored}; return Promise.resolve(stored); } return N.request(N.active, {live:'get_live_categories',movies:'get_vod_categories',series:'get_series_categories'}[kind]).then(function (d) { d = Array.isArray(d) ? d : []; N.cache[key] = {time:Date.now(),data:d}; if (N.PersistentCache) N.PersistentCache.set(key,d,86400000); return d; }); };
-  N.epg = function (item, limit) { var id = N.contentId(item), key = N.key('cache', 'epg:' + id), cached = N.cache[key], stored = N.PersistentCache && N.PersistentCache.get(key); if (cached && Date.now() - cached.time < 120000) return Promise.resolve(cached.data); if (stored) { N.cache[key] = {time:Date.now(),data:stored}; return Promise.resolve(stored); } return N.request(N.active, 'get_short_epg', {stream_id:id,limit:limit || 4}).then(function (d) { var data = d && Array.isArray(d.epg_listings) ? d.epg_listings : []; N.cache[key] = {time:Date.now(),data:data}; if (N.PersistentCache) N.PersistentCache.set(key,data,300000); return data; }); };
+  N.epg = function (item, limit) {
+    var id = N.contentId(item), key = N.key('cache', 'epg:' + id), cached = N.cache[key], stored = N.PersistentCache && N.PersistentCache.get(key), request, result;
+    N.epgMemoryOrder = N.epgMemoryOrder || [];
+    function remember(data) {
+      var oldIndex = N.epgMemoryOrder.indexOf(key); if (oldIndex >= 0) N.epgMemoryOrder.splice(oldIndex, 1);
+      N.epgMemoryOrder.push(key); N.cache[key] = {time:Date.now(),data:data};
+      while (N.epgMemoryOrder.length > 36) delete N.cache[N.epgMemoryOrder.shift()];
+      return data;
+    }
+    if (cached && Date.now() - cached.time < 120000) return Promise.resolve(remember(cached.data));
+    if (stored) return Promise.resolve(remember(stored));
+    request = N.request(N.active, 'get_short_epg', {stream_id:id,limit:limit || 4});
+    result = request.then(function (d) { var data = d && Array.isArray(d.epg_listings) ? d.epg_listings : []; remember(data); if (N.PersistentCache) N.PersistentCache.set(key,data,300000); return data; });
+    result.abort = request.abort; return result;
+  };
   N.contentId = function (item) { return String(item.stream_id || item.series_id || item.id); };
   N.favorite = function (kind, item) { var key = N.key('favorites'), items = N.read(key, {}), id = kind + ':' + N.contentId(item); if (items[id]) delete items[id]; else items[id] = {kind:kind,item:item}; N.write(key, items); return !!items[id]; };
   N.getFavorites = function () { return N.read(N.key('favorites'), {}); };

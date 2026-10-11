@@ -28,6 +28,7 @@
   var schema = {
     liveBufferSeconds: { defaultValue: 60, min: 60, max: 300, step: 30 },
     vodBufferSeconds: { defaultValue: 10, min: 5, max: 120, step: 5 },
+    performanceMode: { defaultValue: "auto", values: ["auto", "speed", "quality"] },
     theme: { defaultValue: "noir", values: N.ThemeCatalog.map(function (theme) { return theme.id; }) },
     shortcutRed: { defaultValue: "continue", values: shortcutValues },
     shortcutGreen: { defaultValue: "settings", values: shortcutValues },
@@ -82,5 +83,13 @@
     document.documentElement.setAttribute("data-theme", theme);
     if (meta) meta.setAttribute("content", color);
   };
+  N.applyPerformanceMode = function () {
+    var selected = N.Settings.get("performanceMode"), effective = selected;
+    if (selected === "auto") effective = typeof tizen !== "undefined" ? "speed" : "quality";
+    document.documentElement.setAttribute("data-performance", effective);
+    document.documentElement.setAttribute("data-performance-setting", selected);
+    return effective;
+  };
   N.applyTheme();
+  N.applyPerformanceMode();
 })(Noir);

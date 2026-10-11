@@ -32,7 +32,7 @@
     var preview = document.getElementById("live-preview"), name = document.getElementById("live-selected-name"), logo = document.getElementById("live-mini-logo"), epg = document.getElementById("live-epg");
     if (!preview || !item) return;
     if (name) name.textContent = item.name || "Canal";
-    if (logo && !document.querySelector("#live-mini-stage .live-mini-plane,#live-mini-stage .live-mini-video")) logo.src = item.stream_icon || "assets/fallback.svg";
+    if (logo) logo.src = item.stream_icon || "assets/fallback.svg";
     if (epg) epg.innerHTML = '<div class="epg-loading">Carregando programação…</div>';
     clearTimeout(liveEpgTimer);
     var token = ++liveEpgToken;

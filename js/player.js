@@ -66,6 +66,23 @@
     try { player.setBufferingParam("PLAYER_BUFFER_FOR_RESUME", "PLAYER_BUFFER_SIZE_IN_SECOND", seconds); }
     catch (resumeError) { console.log("AVPLAY RESUME BUFFER ERROR", resumeError); }
   }
+  function setMiniVideoVisible(stage, visible) {
+    var logo = document.getElementById("live-mini-logo");
+    if (stage && stage.classList) stage.classList[visible ? "add" : "remove"]("mini-playing");
+    if (logo) logo.style.visibility = visible ? "hidden" : "visible";
+  }
+  function syncMiniDisplayRect(stage, plane, player) {
+    if (!stage || !plane || !player || !player.setDisplayRect) return false;
+    var rect = stage.getBoundingClientRect(), viewportWidth = document.documentElement.clientWidth || window.innerWidth || 1920,
+      ratio = 1920 / Math.max(1, viewportWidth), left = Math.max(0, Math.round(rect.left * ratio)), top = Math.max(0, Math.round(rect.top * ratio)),
+      width = Math.max(2, Math.round(rect.width * ratio)), height = Math.max(2, Math.round(rect.height * ratio));
+    width = Math.min(width, 1920 - left); height = Math.min(height, 1080 - top);
+    plane.style.position = "absolute"; plane.style.left = "0px"; plane.style.top = "0px";
+    plane.style.width = "100%"; plane.style.height = "100%"; plane.style.backgroundColor = "transparent";
+    if (width < 2 || height < 2) return false;
+    player.setDisplayRect(left, top, width, height);
+    return true;
+  }
   N.stopLiveMiniPlayer = function () {
     clearTimeout(miniStartTimer);
     miniStartTimer = null;
@@ -85,6 +102,7 @@
       try { miniAv.close(); } catch (ignoreClose) {}
       miniAv = null;
     }
+    setMiniVideoVisible(document.getElementById("live-mini-stage"), false);
     miniItem = null;
   };
   N.queueLiveMiniPlayer = function (item, delay) {
@@ -121,21 +139,20 @@
       try {
         miniAv = webapis.avplay;
         miniPlane = document.createElement("object");
-        var rect = stage.getBoundingClientRect(), scaleX = 1920 / Math.max(1, window.innerWidth), scaleY = 1080 / Math.max(1, window.innerHeight);
         miniPlane.type = "application/avplayer";
         miniPlane.className = "live-mini-plane";
         stage.insertBefore(miniPlane, stage.firstChild);
         miniAv.open(url);
         applyAVBuffer(miniAv, "mini");
-        miniAv.setDisplayRect(Math.round(rect.left * scaleX), Math.round(rect.top * scaleY), Math.round(rect.width * scaleX), Math.round(rect.height * scaleY));
+        if (!syncMiniDisplayRect(stage, miniPlane, miniAv)) throw new Error("Área da prévia inválida");
         miniAv.setListener({
           onbufferingstart: function () { setMiniStatus("Preparando canal…"); },
           onbufferingprogress: function (percent) { setMiniStatus("Buffer " + Math.max(0, Math.min(100, Math.round(Number(percent) || 0))) + "%"); },
           onbufferingcomplete: function () { setMiniStatus(""); },
           oncurrentplaytime: function () {}, onstreamcompleted: function () {}, onevent: function () {}, onsubtitlechange: function () {}, ondrmevent: function () {},
-          onerror: function () { setMiniStatus("Não foi possível reproduzir a prévia."); }
+          onerror: function () { setMiniVideoVisible(stage, false); setMiniStatus("Não foi possível reproduzir a prévia."); }
         });
-        miniAv.prepareAsync(function () { if (!valid()) return; try { if (miniAv.setDisplayMethod) miniAv.setDisplayMethod("PLAYER_DISPLAY_MODE_LETTER_BOX"); miniAv.play(); setMiniStatus(""); } catch (error) { setMiniStatus("Falha ao iniciar a prévia."); } }, function () { setMiniStatus("Prévia indisponível."); });
+        miniAv.prepareAsync(function () { if (!valid()) return; try { syncMiniDisplayRect(stage, miniPlane, miniAv); if (miniAv.setDisplayMethod) miniAv.setDisplayMethod("PLAYER_DISPLAY_MODE_LETTER_BOX"); miniAv.play(); setMiniVideoVisible(stage, true); setMiniStatus(""); } catch (error) { setMiniVideoVisible(stage, false); setMiniStatus("Falha ao iniciar a prévia."); } }, function () { setMiniVideoVisible(stage, false); setMiniStatus("Prévia indisponível."); });
         return true;
       } catch (error) { N.stopLiveMiniPlayer(); miniItem = item; generation = ++miniGeneration; }
     }
@@ -143,6 +160,8 @@
     miniVideo.className = "live-mini-video";
     miniVideo.autoplay = true;
     miniVideo.src = url;
+    miniVideo.onplaying = function () { if (valid()) { setMiniVideoVisible(stage, true); setMiniStatus(""); } };
+    miniVideo.onerror = function () { if (valid()) { setMiniVideoVisible(stage, false); setMiniStatus("Prévia disponível somente na TV."); } };
     stage.insertBefore(miniVideo, stage.firstChild);
     try { var playing = miniVideo.play(); if (playing && playing.catch) playing.catch(function () { setMiniStatus("Prévia disponível somente na TV."); }); } catch (nativeError) { setMiniStatus("Prévia disponível somente na TV."); }
     return true;

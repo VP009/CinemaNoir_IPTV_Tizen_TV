@@ -424,7 +424,8 @@ header .active-profile{margin-left:auto;padding:9px 16px;border:1px solid rgba(1
 .live-preview{display:flex!important;min-height:0;flex-direction:column;padding:16px!important}
 .live-mini-stage{position:relative;flex:0 0 42%;min-height:210px;overflow:hidden;border:1px solid var(--border);border-radius:14px;background:#000}
 .live-mini-stage>img{width:100%;height:100%;object-fit:contain;background:var(--bg-secondary)}
-.live-mini-plane,.live-mini-video{position:absolute;inset:0;width:100%;height:100%;z-index:1;background:#000;object-fit:contain}
+.live-mini-plane,.live-mini-video{position:absolute;left:0;top:0;width:100%;height:100%;z-index:2;background:transparent!important;object-fit:contain}
+.live-mini-stage.mini-playing>img{visibility:hidden}
 #live-mini-status{position:absolute;left:50%;top:50%;z-index:3;transform:translate(-50%,-50%);padding:9px 13px;border-radius:9px;background:rgba(7,6,11,.82);font-size:16px;white-space:nowrap}
 .live-playing-title{display:block;margin:10px 0 2px;color:var(--purple-light);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .live-preview h2{margin:2px 0 8px;font-size:25px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

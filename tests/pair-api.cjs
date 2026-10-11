@@ -35,6 +35,6 @@ function call(method, body, query) {
   assert.equal((await call("POST", { action:"add", code:"ABC123", list:{} })).statusCode, 400);
   const versionHandler = require("../api/version.js"), versionResult = { statusCode:0, body:null, headers:{} };
   await versionHandler({}, { setHeader(k,v){versionResult.headers[k]=v;}, status(code){versionResult.statusCode=code;return this;}, json(body){versionResult.body=body;return versionResult;} });
-  assert.equal(versionResult.statusCode,200); assert.equal(versionResult.body.version,"1.1.1"); assert.equal(versionResult.body.storeManaged,true);
+  assert.equal(versionResult.statusCode,200); assert.equal(versionResult.body.version,"1.1.2"); assert.equal(versionResult.body.storeManaged,true);
   console.log("PASS: API gerencia, renomeia, ativa, ordena listas e informa a versão da TV.");
 }()).catch(function (error) { console.error(error); process.exit(1); });

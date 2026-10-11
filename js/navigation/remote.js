@@ -88,8 +88,8 @@
     pendingNavigationCode = code;
     if (navigationTimer) return;
     elapsed = Date.now() - lastNavigationAt;
-    delay = Math.max(0, 46 - elapsed);
-    if (!delay && window.requestAnimationFrame) navigationTimer = window.requestAnimationFrame(flushNavigation);
+    delay = Math.max(0, 30 - elapsed);
+    if (!delay) flushNavigation();
     else navigationTimer = setTimeout(flushNavigation, delay);
   }
   N.RemoteNavigation = window.RemoteNavigation = { init: function () { N.initRemoteKeys(); } };

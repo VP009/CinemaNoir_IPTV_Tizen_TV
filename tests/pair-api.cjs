@@ -27,7 +27,14 @@ function call(method, body, query) {
   const ack = await call("POST", { action:"ack", code, token, commandId, status:"success", message:"Lista adicionada.", device:updated });
   assert.equal(ack.body.device.lists.length, 3); assert.equal(ack.body.queued, 0); assert.equal(ack.body.events[0].status, "success");
   assert.equal((await call("POST", { action:"activate", code, profileId:"p2" })).body.status, "queued");
+  assert.equal((await call("POST", { action:"rename", code, profileId:"p2", name:"Quarto principal" })).body.status, "queued");
+  assert.equal((await call("POST", { action:"set-enabled", code, profileId:"p2", enabled:false })).body.status, "queued");
+  assert.equal((await call("POST", { action:"reorder", code, profileIds:["p3","p2","p1"] })).body.status, "queued");
+  assert.equal((await call("POST", { action:"reorder", code, profileIds:["p1"] })).statusCode, 400);
   assert.equal((await call("POST", { action:"remove", code, profileId:"missing" })).statusCode, 400);
   assert.equal((await call("POST", { action:"add", code:"ABC123", list:{} })).statusCode, 400);
-  console.log("PASS: API numérica gerencia múltiplas listas com fila e confirmação da TV.");
+  const versionHandler = require("../api/version.js"), versionResult = { statusCode:0, body:null, headers:{} };
+  await versionHandler({}, { setHeader(k,v){versionResult.headers[k]=v;}, status(code){versionResult.statusCode=code;return this;}, json(body){versionResult.body=body;return versionResult;} });
+  assert.equal(versionResult.statusCode,200); assert.equal(versionResult.body.version,"1.1.0"); assert.equal(versionResult.body.storeManaged,true);
+  console.log("PASS: API gerencia, renomeia, ativa, ordena listas e informa a versão da TV.");
 }()).catch(function (error) { console.error(error); process.exit(1); });

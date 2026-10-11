@@ -14,7 +14,7 @@
     for (i = 0; i < values.length; i += 1) code += String(values[i] % 10); return code;
   }
   function deviceState() {
-    return { activeId: N.active && N.active.id || "", lists: (N.profiles || []).map(function (profile) { return { id: profile.id, name: profile.name }; }) };
+    return { activeId: N.active && N.active.id || "", lists: (N.profiles || []).map(function (profile) { return { id: profile.id, name: profile.name, enabled: profile.enabled !== false }; }) };
   }
   function request(method, url, body, done) {
     var xhr = new XMLHttpRequest(); xhr.open(method, url, true); xhr.timeout = 10000;
@@ -46,6 +46,27 @@
       saveProfiles();
       if (N.active && N.active.id === command.profileId) { if (N.profiles.length) N.activate(N.profiles[0].id); else { N.active = null; N.write("active", null); } }
       return Promise.resolve("Lista “" + removed.name + "” removida.");
+    }
+    if (command.type === "rename") {
+      var renamed = N.profiles.filter(function (profile) { return profile.id === command.profileId; })[0];
+      if (!renamed) return Promise.reject(new Error("Lista não encontrada na TV."));
+      renamed.name = String(command.name || "Lista").trim().slice(0, 60); saveProfiles();
+      return Promise.resolve("Lista renomeada para “" + renamed.name + "”.");
+    }
+    if (command.type === "set-enabled") {
+      var changed = N.profiles.filter(function (profile) { return profile.id === command.profileId; })[0];
+      if (!changed) return Promise.reject(new Error("Lista não encontrada na TV."));
+      changed.enabled = command.enabled !== false; saveProfiles();
+      if (!changed.enabled && N.active && N.active.id === changed.id) {
+        var next = N.profiles.filter(function (profile) { return profile.enabled !== false; })[0];
+        if (next) N.activate(next.id); else { N.active = null; N.write("active", null); }
+      }
+      return Promise.resolve("Lista “" + changed.name + "” " + (changed.enabled ? "ativada" : "desativada") + ".");
+    }
+    if (command.type === "reorder") {
+      var ordered = [], remaining = N.profiles.slice();
+      (command.profileIds || []).forEach(function (id) { for (var i = 0; i < remaining.length; i += 1) if (remaining[i].id === id) { ordered.push(remaining.splice(i, 1)[0]); break; } });
+      N.profiles = ordered.concat(remaining); saveProfiles(); return Promise.resolve("Ordem das listas atualizada.");
     }
     return Promise.reject(new Error("Comando desconhecido."));
   }

@@ -23,9 +23,10 @@
       var style = getComputedStyle(track), horizontal = track.classList.contains("season-list") || track.classList.contains("horizontal-track");
       var template = style.gridTemplateColumns || "none", repeatMatch = /repeat\(\s*(\d+)/.exec(template);
       var cols = horizontal ? list.length : Math.max(1, template === "none" ? 1 : repeatMatch ? Number(repeatMatch[1]) : template.split(/\s+/).length);
+      var measuredGap = track.id === "categories" ? parseFloat(getComputedStyle(list[0]).marginBottom) || 0 : parseFloat(style.rowGap || style.gridRowGap) || 0;
       track._scroller = new N.GridScroller({ track: track, columns: cols, cardHeight: list[0].offsetHeight || 320,
-        cardWidth: list[0].offsetWidth || 220, rowGap: parseFloat(style.rowGap || style.gridRowGap) || 0,
-        columnGap: parseFloat(style.columnGap || style.gridColumnGap) || 0, safeMargin: 40, totalItems: list.length, currentY: Number(track.dataset.offsetY || 0) });
+        cardWidth: list[0].offsetWidth || 220, rowGap: measuredGap,
+        columnGap: parseFloat(style.columnGap || style.gridColumnGap) || 0, safeMargin: 40, totalItems: track._virtualTotal || list.length, currentY: Number(track.dataset.offsetY || 0) });
       track._horizontal = horizontal; track._itemCount = list.length; track._firstItem = list[0];
     }
     return track._scroller;

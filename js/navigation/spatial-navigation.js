@@ -59,7 +59,9 @@
   }
 
   function getColumns(items) {
-    if (!items || items.length < 2) return 1;
+    if (!items || !items.length) return 1;
+    if (items[0].parentElement._virtualColumns) return items[0].parentElement._virtualColumns;
+    if (items.length < 2) return 1;
     return N.getGridScroller(items[0].parentElement).columns;
   }
 
@@ -79,11 +81,11 @@
     var items = getGridItems(grid);
     if (!items.length) return false;
 
-    var index = items.indexOf(current);
-    if (index < 0) return false;
+    var localIndex = items.indexOf(current), index = current.dataset && current.dataset.index !== undefined ? Number(current.dataset.index) : localIndex;
+    if (localIndex < 0 || index < 0) return false;
 
     var columns = getColumns(items);
-    var targetIndex = index;
+    var targetIndex = index, total = grid._virtualTotal || items.length;
 
     if (direction === "left") {
       if (isFirstColumn(items, index, columns)) {
@@ -96,25 +98,28 @@
       }
       targetIndex = index - 1;
     } else if (direction === "right") {
-      if ((index + 1) % columns !== 0 && index + 1 < items.length) targetIndex = index + 1;
+      if ((index + 1) % columns !== 0 && index + 1 < total) targetIndex = index + 1;
       else return true;
     } else if (direction === "up") {
       targetIndex = index - columns;
       if (targetIndex < 0) return true;
     } else if (direction === "down") {
       targetIndex = index + columns;
-      if (targetIndex >= items.length) {
-        var last = items.length - 1;
+      if (targetIndex >= total) {
+        var last = total - 1;
         var candidate = last - (last % columns);
         if (candidate > index) targetIndex = last;
         else return true;
       }
     }
 
-    if (targetIndex < 0 || targetIndex >= items.length) return true;
+    if (targetIndex < 0 || targetIndex >= total) return true;
     if (targetIndex === index) return true;
 
-    N.focus(items[targetIndex]);
+    if (grid._focusVirtualIndex) {
+      var renderedTarget = grid.querySelector('.poster[data-index="' + targetIndex + '"]');
+      if (renderedTarget) N.focus(renderedTarget); else grid._focusVirtualIndex(targetIndex);
+    } else N.focus(items[targetIndex]);
     return true;
   }
 
@@ -217,7 +222,7 @@
     if (grid) {
       if (direction === "up") {
         var gridItems = getGridItems(grid);
-        var gridIndex = gridItems.indexOf(current);
+        var gridIndex = current.dataset && current.dataset.index !== undefined ? Number(current.dataset.index) : gridItems.indexOf(current);
         var gridColumns = getColumns(gridItems);
         if (gridIndex >= 0 && gridIndex < gridColumns) {
           var aboveTarget = document.getElementById("filter") ||
@@ -253,7 +258,9 @@
     if (categoryContainer) {
       if (direction === "right") {
         var catalog = document.getElementById("catalog");
-        var firstCard = catalog && document.getElementById(catalog._lastFocus) || document.querySelector("#catalog .poster");
+        var firstCard = catalog && catalog._lastFocus && document.getElementById(catalog._lastFocus);
+        if (!firstCard && catalog && catalog._focusVirtualIndex && catalog.dataset.lastIndex) { catalog._focusVirtualIndex(Number(catalog.dataset.lastIndex)); return; }
+        if (!firstCard) firstCard = document.querySelector("#catalog .poster");
         if (firstCard) {
           N.focus(firstCard);
         }

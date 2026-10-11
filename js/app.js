@@ -360,7 +360,8 @@
             N.focusHistory.patch(kind, { itemIndex: position.index, query: "" });
             update();
             var cards = grid.querySelectorAll(".poster");
-            if (cards.length) { N.getGridScroller(grid).setY(position.scrollY); N.focus(cards[Math.min(position.index, cards.length - 1)]); }
+            if (grid._focusVirtualIndex) { N.getGridScroller(grid).setY(position.scrollY); grid._focusVirtualIndex(position.index); }
+            else if (cards.length) { N.getGridScroller(grid).setY(position.scrollY); N.focus(cards[Math.min(position.index, cards.length - 1)]); }
             else N.focus(this);
           };
         });
@@ -424,11 +425,12 @@
       }),
       root = document.getElementById("catalog"),
       signature = kind + "|" + category + "|" + q,
-      limit =
-        root.dataset.signature === signature
-          ? Number(root.dataset.limit || 40)
-          : Math.max(40, Number(N.focusHistory.get(kind).itemIndex || 0) + 1),
-      filtered = all.slice(0, limit);
+      previousSignature = root.dataset.signature,
+      initialIndex = previousSignature === signature ? Number(root.dataset.lastIndex || 0) : Number(N.focusHistory.get(kind).itemIndex || 0),
+      columns = kind === "live" ? 1 : window.innerWidth >= 2300 ? 8 : window.innerWidth >= 1400 ? 7 : 6,
+      rowHeight = kind === "live" ? 112 : window.innerWidth < 1400 || window.innerHeight < 800 ? 266 : 346,
+      windowRows = kind === "live" ? 13 : 7,
+      beforeRows = kind === "live" ? 5 : 3;
     root._renderVersion = Number(root._renderVersion || 0) + 1;
     function catalogItemId(item) {
       return (kind === "series" ? "SERIES_" : kind === "live" ? "CHANNEL_" : "MOVIE_") + N.contentId(item);
@@ -439,46 +441,18 @@
         titleHtml = esc(titleText),
         marqueeClass = titleText.length > 19 ? "title-marquee is-overflowing" : "title-marquee",
         percent = saved && saved.duration ? Math.min(100, Math.round((saved.position / saved.duration) * 100)) : 0;
-      return '<button class="poster" data-index="' + n + '" id="' + catalogItemId(i) + '"><img loading="lazy" decoding="async" src="' +
+      return '<button class="poster" data-index="' + n + '" id="' + catalogItemId(i) + '"><img class="progressive-image" loading="lazy" decoding="async" src="assets/fallback.svg" data-src="' +
         esc(i.stream_icon || i.cover || "assets/fallback.svg") +
-        '" onerror="this.onerror=null;this.src=\'assets/fallback.svg\'"><span class="label"><span class="' + marqueeClass + '"><span class="title-copy">' +
+        '"><span class="label"><span class="' + marqueeClass + '"><span class="title-copy">' +
         titleHtml + '</span><span class="title-copy title-copy-clone" aria-hidden="true">' + titleHtml + "</span></span></span>" +
         (percent ? '<span class="card-progress"><i style="width:' + percent + '%"></i></span>' : "") +
         (lookup.favorites[kind + ":" + N.contentId(i)] ? '<span class="star" aria-label="Favorito">' + icon("star") + "</span>" : "") + "</button>";
     }
     root.dataset.signature = signature;
-    root.dataset.limit = limit;
+    root.dataset.limit = all.length;
     root.className = "media-grid";
     root._scroller = null;
     root.dataset.region = kind === "live" ? "channels" : kind + "-grid";
-    root.innerHTML = filtered.map(catalogCard).join("") || '<div class="empty">Nenhum conteúdo encontrado.</div>';
-    function loadNextCatalogBatch(focusedId) {
-      if (root._loadingMore || filtered.length >= all.length) return;
-      root._loadingMore = true;
-      var expectedSignature = signature, expectedVersion = root._renderVersion;
-      setTimeout(function () {
-        var start, nextLimit, added, scroller;
-        if (!document.documentElement.contains(root) || root.dataset.signature !== expectedSignature || root._renderVersion !== expectedVersion) { root._loadingMore = false; return; }
-        start = filtered.length;
-        nextLimit = Math.min(all.length, start + (kind === "live" ? 24 : 18));
-        added = all.slice(start, nextLimit);
-        if (added.length) root.insertAdjacentHTML("beforeend", added.map(function (item, index) { return catalogCard(item, start + index); }).join(""));
-        filtered = all.slice(0, nextLimit);
-        limit = nextLimit;
-        root.dataset.limit = String(nextLimit);
-        root._focusItems = null;
-        root._focusChildCount = -1;
-        wireCatalogItems(added, start);
-        scroller = root._scroller;
-        if (scroller) {
-          scroller.totalItems = nextLimit;
-          scroller.refresh(nextLimit);
-          root._itemCount = nextLimit;
-          root._firstItem = root.children[0];
-        }
-        root._loadingMore = false;
-      }, 0);
-    }
     function wireCatalogItems(batch, startIndex) {
       batch.forEach(function (item, relativeIndex) {
         var id = catalogItemId(item), b = document.getElementById(id);
@@ -490,28 +464,48 @@
           open(kind, item);
         };
         b.onfocus = function () {
-          var focusedIndex = Number(this.dataset.index), scroller, preloadDistance;
+          var focusedIndex = Number(this.dataset.index);
           root.dataset.lastIndex = this.dataset.index;
           if (kind === "live") {
             N.focusHistory.patch(kind, { focusedChannelId: N.contentId(item), channelIndex: focusedIndex });
             showLiveSelection(item);
             if (N.queueLiveMiniPlayer) N.queueLiveMiniPlayer(item, 360);
           }
-          if (filtered.length < all.length) {
-            scroller = N.getGridScroller(root);
-            preloadDistance = Math.max(8, (scroller && scroller.columns || 6) * 3);
-            if (focusedIndex >= filtered.length - preloadDistance) loadNextCatalogBatch(id);
-          }
         };
         b._favorite = function () {
           N.favorite(kind, item);
           N.toast(N.isFavorite(kind, item) ? "★ Adicionado aos favoritos" : "Removido dos favoritos");
           drawCatalog(kind, items, query, category);
-          N.focus(document.getElementById(id));
+          if (root._focusVirtualIndex) root._focusVirtualIndex(Number(b.dataset.index || 0));
         };
       });
     }
-    wireCatalogItems(filtered, 0);
+    function renderWindow(centerIndex) {
+      var totalRows = Math.ceil(all.length / columns), centerRow, startRow, endRow, start, end, batch, remainingRows;
+      centerIndex = Math.max(0, Math.min(Math.max(0, all.length - 1), Number(centerIndex) || 0));
+      centerRow = Math.floor(centerIndex / columns);
+      startRow = Math.max(0, Math.min(Math.max(0, totalRows - windowRows), centerRow - beforeRows));
+      endRow = Math.min(totalRows, startRow + windowRows);
+      start = startRow * columns; end = Math.min(all.length, endRow * columns); batch = all.slice(start, end);
+      remainingRows = Math.max(0, totalRows - endRow);
+      root.style.setProperty("--virtual-top", (startRow ? startRow * rowHeight : 2) + "px");
+      root.style.setProperty("--virtual-bottom", (remainingRows ? remainingRows * rowHeight : kind === "live" ? 40 : 44) + "px");
+      root.innerHTML = batch.map(function (item, offset) { return catalogCard(item, start + offset); }).join("") || '<div class="empty">Nenhum conteúdo encontrado.</div>';
+      root._virtualStart = start; root._virtualEnd = end; root._focusItems = null; root._focusChildCount = -1; root._scroller = null;
+      wireCatalogItems(batch, start);
+      if (N.loadImages) N.loadImages(root);
+    }
+    root._virtualTotal = all.length; root._virtualColumns = columns;
+    root._focusVirtualIndex = function (index) {
+      if (!all.length) return false;
+      index = Math.max(0, Math.min(all.length - 1, Number(index) || 0));
+      if (index < root._virtualStart || index >= root._virtualEnd) renderWindow(index);
+      var target = root.querySelector('.poster[data-index="' + index + '"]'), scroller;
+      if (!target) return false;
+      scroller = N.getGridScroller(root); if (scroller) { scroller.totalItems = all.length; scroller.refresh(all.length); }
+      return N.focus(target);
+    };
+    renderWindow(initialIndex);
   }
   function open(kind, item) {
     if (kind === "live") {
@@ -804,7 +798,7 @@
       return '<button class="theme-choice" data-theme-choice="' + theme.id + '"><span class="theme-preview preview-' + theme.id + '" style="--preview-bg:' + colors.background + ';--preview-surface:' + colors.surface + ';--preview-primary:' + colors.primary + ';--preview-focus:' + colors.focus + '"><i></i><i></i><i></i></span><span class="theme-copy"><strong>' + theme.name + '</strong><small>' + theme.description + '</small></span></button>';
     }).join("");
     page(
-      '<div class="settings-page"><div class="toolbar"><h1>Configurações</h1></div><div class="settings-columns"><div class="settings-lists"><div class="panel"><button id="add">' + icon("plus") + ' Adicionar lista</button><div id="profiles"></div><div class="shortcut-settings"><h2>Atalhos coloridos</h2><p>Pressione OK para trocar a função.</p><div class="shortcut-config-grid">' + shortcutConfigMarkup() + '</div></div></div></div><div class="settings-options"><div class="panel playback-settings"><h2>Buffer de reprodução</h2><div class="buffer-option"><h3>TV ao vivo</h3><p>O mínimo é 1 minuto e a mudança vale ao abrir o próximo canal.</p><div class="buffer-setting"><button id="buffer-minus" aria-label="Diminuir buffer da TV ao vivo">− 30s</button><strong id="live-buffer-value"></strong><button id="buffer-plus" aria-label="Aumentar buffer da TV ao vivo">+ 30s</button></div><small>Intervalo: 60 a 300 segundos.</small></div><div class="buffer-option"><h3>Filmes e séries</h3><p>Controla o buffer inicial e a recuperação após interrupções.</p><div class="buffer-setting"><button id="vod-buffer-minus" aria-label="Diminuir buffer de filmes e séries">− 5s</button><strong id="vod-buffer-value"></strong><button id="vod-buffer-plus" aria-label="Aumentar buffer de filmes e séries">+ 5s</button></div><small>Intervalo: 5 a 120 segundos.</small></div></div><div class="panel theme-settings"><div class="theme-heading"><span><h2>Temas</h2><p>Escolha com ↑ e ↓. A prévia é aplicada imediatamente.</p></span><strong id="theme-position"></strong></div><div class="theme-scroll"><div id="theme-track" class="theme-switch vertical-track" data-region="themes">' + themeMarkup + '</div></div><div class="theme-scroll-hint">↑ ↓ Navegar · OK Aplicar</div></div></div></div></div>',
+      '<div class="settings-page"><div class="toolbar"><h1>Configurações</h1></div><div class="settings-columns"><div class="settings-lists"><div class="panel"><button id="add">' + icon("plus") + ' Adicionar lista</button><div id="profiles"></div><div class="shortcut-settings"><h2>Atalhos coloridos</h2><p>Pressione OK para trocar a função.</p><div class="shortcut-config-grid">' + shortcutConfigMarkup() + '</div></div></div></div><div class="settings-options"><div class="panel playback-settings"><h2>Buffer de reprodução</h2><div class="buffer-option"><h3>TV ao vivo</h3><p>O mínimo é 1 minuto e a mudança vale ao abrir o próximo canal.</p><div class="buffer-setting"><button id="buffer-minus" aria-label="Diminuir buffer da TV ao vivo">− 30s</button><strong id="live-buffer-value"></strong><button id="buffer-plus" aria-label="Aumentar buffer da TV ao vivo">+ 30s</button></div><small>Intervalo: 60 a 300 segundos.</small></div><div class="buffer-option"><h3>Filmes e séries</h3><p>Controla o buffer inicial e a recuperação após interrupções.</p><div class="buffer-setting"><button id="vod-buffer-minus" aria-label="Diminuir buffer de filmes e séries">− 5s</button><strong id="vod-buffer-value"></strong><button id="vod-buffer-plus" aria-label="Aumentar buffer de filmes e séries">+ 5s</button></div><small>Intervalo: 5 a 120 segundos.</small></div><div class="update-setting"><span><b>Aplicativo v' + esc(N.APP_VERSION || "1.0.0") + '</b><small>Atualizações automáticas pela Samsung Apps TV.</small></span><button id="check-update">Verificar</button></div></div><div class="panel theme-settings"><div class="theme-heading"><span><h2>Temas</h2><p>Escolha com ↑ e ↓. A prévia é aplicada imediatamente.</p></span><strong id="theme-position"></strong></div><div class="theme-scroll"><div id="theme-track" class="theme-switch vertical-track" data-region="themes">' + themeMarkup + '</div></div><div class="theme-scroll-hint">↑ ↓ Navegar · OK Aplicar</div></div></div></div></div>',
       false,
       "settings-viewport",
     );
@@ -833,6 +827,7 @@
       N.toast("Buffer de filmes e séries: " + vodBufferSeconds + " segundos.");
     };
     showBufferValue();
+    document.getElementById("check-update").onclick = function () { N.checkForUpdates(true); };
     document.querySelectorAll("[data-shortcut-color]").forEach(function (button) {
       button.onclick = function () {
         var color = this.dataset.shortcutColor, key = "shortcut" + color.charAt(0).toUpperCase() + color.slice(1), currentId = N.Settings.get(key), currentIndex = -1, i;
@@ -870,15 +865,16 @@
       .map(function (p, n) {
         return (
           '<div class="profile-row ' +
-          (p.id === N.active.id ? "profile-active" : "") +
+          (p.id === N.active.id ? "profile-active " : "") +
+          (p.enabled === false ? "profile-disabled" : "") +
           '"><strong>' +
           esc(p.name) +
-          (p.id === N.active.id ? " · ATIVA" : "") +
+          (p.id === N.active.id ? " · ATIVA" : p.enabled === false ? " · DESATIVADA" : "") +
           "</strong><span>" +
           esc(p.baseUrl) +
           '</span><button id="activate-' +
           n +
-          '">' +
+          '"' + (p.enabled === false ? " disabled" : "") + '>' +
           icon("user") +
           ' Usar</button><button id="test-' +
           n +
@@ -898,6 +894,7 @@
       .join("");
     N.profiles.forEach(function (p, n) {
       document.getElementById("activate-" + n).onclick = function () {
+        if (p.enabled === false) return;
         N.activate(p.id);
         N.toast("Lista ativa: " + p.name);
         N.render();

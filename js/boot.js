@@ -15,6 +15,7 @@
 	Noir.started = false;
 	function startApplication() {
 		try {
+			if (Noir.cleanupOldData) Noir.cleanupOldData();
 			if (typeof tizen !== "undefined" && tizen.tvinputdevice) {
 				document.documentElement.classList.add("tizen-device");
 				["MediaPlay", "MediaPause", "MediaFastForward", "MediaRewind", "MediaStop"].forEach(function (key) {
@@ -28,9 +29,14 @@
 			if (Noir.initRemoteKeys) Noir.initRemoteKeys();
 			var active = Noir.read("active", null);
 			if (active) Noir.activate(active);
+			if (!Noir.active && Noir.profiles && Noir.profiles.length) {
+				var available = Noir.profiles.filter(function (profile) { return profile.enabled !== false; })[0];
+				if (available) Noir.activate(available.id);
+			}
 			if (!location.hash) location.hash = Noir.active ? "#/home" : "#/login";
 			Noir.started = true;
 			Noir.render();
+			if (Noir.checkForUpdates) setTimeout(function () { Noir.checkForUpdates(false); }, 2500);
 		} catch (error) {
 			Noir.fail(error.message || String(error));
 		}

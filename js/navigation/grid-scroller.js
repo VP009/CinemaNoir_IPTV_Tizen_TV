@@ -51,10 +51,11 @@
     var grid = document.getElementById("catalog");
     var viewport = grid && grid.parentElement || document.querySelector(".grid-scroll");
     if (!viewport || !grid || index < 0) return 0;
-    var first = grid.querySelector ? grid.querySelector(".poster") : null,
-      style = typeof getComputedStyle === "function" ? getComputedStyle(grid) : null,
-      cardHeight = first && first.offsetHeight || 326,
-      gap = style ? parseFloat(style.rowGap || style.gridRowGap) || 20 : 20,
+    var scroller = grid._scroller,
+      first = !scroller && grid.querySelector ? grid.querySelector(".poster") : null,
+      style = !scroller && typeof getComputedStyle === "function" ? getComputedStyle(grid) : null,
+      cardHeight = scroller ? scroller.cardHeight : first && first.offsetHeight || 326,
+      gap = scroller ? scroller.rowGap : style ? parseFloat(style.rowGap || style.gridRowGap) || 20 : 20,
       rowHeight = cardHeight + gap;
     var columns = grid._scroller && grid._scroller.columns || (window.innerWidth >= 2300 ? 8 : window.innerWidth >= 1400 ? 7 : 6);
     var row = Math.floor(index / columns);
@@ -75,10 +76,11 @@
     var list = document.getElementById("categories");
     var viewport = list && list.parentElement || document.querySelector(".category-scroll");
     if (!viewport || !list || index < 0) return 0;
-    var first = list.querySelector ? list.querySelector(".category-item") : null,
-      style = typeof getComputedStyle === "function" ? getComputedStyle(first || list) : null,
-      itemHeight = first && first.offsetHeight || 62,
-      gap = style ? parseFloat(style.marginBottom) || 10 : 10,
+    var scroller = list._scroller,
+      first = !scroller && list.querySelector ? list.querySelector(".category-item") : null,
+      style = !scroller && typeof getComputedStyle === "function" ? getComputedStyle(first || list) : null,
+      itemHeight = scroller ? scroller.cardHeight : first && first.offsetHeight || 62,
+      gap = scroller ? scroller.rowGap : style ? parseFloat(style.marginBottom) || 10 : 10,
       rowHeight = itemHeight + gap;
     var itemTop = index * rowHeight;
     var itemBottom = itemTop + itemHeight;

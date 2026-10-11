@@ -22,7 +22,7 @@ async function redis(command) {
 function normalizeCode(value) { return String(value || "").trim(); }
 function safeDevice(value) {
   value = value || {};
-  const lists = Array.isArray(value.lists) ? value.lists.map(function (item) { return { id: String(item.id || "").slice(0, 80), name: String(item.name || "Lista").slice(0, 60) }; }).filter(function (item) { return item.id; }) : [];
+  const lists = Array.isArray(value.lists) ? value.lists.map(function (item) { return { id: String(item.id || "").slice(0, 80), name: String(item.name || "Lista").slice(0, 60), enabled: item.enabled !== false }; }).filter(function (item) { return item.id; }) : [];
   return { lists, activeId: String(value.activeId || "").slice(0, 80) };
 }
 function publicSession(session) { return { status: "connected", device: safeDevice(session.device), queued: (session.commands || []).length, events: (session.events || []).slice(-8), expiresIn: SESSION_SECONDS }; }
@@ -64,10 +64,18 @@ module.exports = async function handler(req, res) {
       const list = normalizeList(body.list); if (!list) return reply(res, 400, { error: "Preencha corretamente servidor, usuário e senha." });
       session.commands.push({ id: newCommandId(), type: "add", list, createdAt: Date.now() }); await writeSession(code, session); return reply(res, 200, { status: "queued" });
     }
-    if (action === "remove" || action === "activate") {
+    if (action === "remove" || action === "activate" || action === "rename" || action === "set-enabled") {
       const profileId = String(body.profileId || "").slice(0, 80);
       if (!profileId || !session.device || !session.device.lists.some(function (item) { return item.id === profileId; })) return reply(res, 400, { error: "Lista não encontrada nesta TV." });
-      session.commands.push({ id: newCommandId(), type: action, profileId, createdAt: Date.now() }); await writeSession(code, session); return reply(res, 200, { status: "queued" });
+      const command = { id: newCommandId(), type: action, profileId, createdAt: Date.now() };
+      if (action === "rename") { command.name = String(body.name || "").trim().slice(0, 60); if (!command.name) return reply(res, 400, { error: "Informe o novo nome da lista." }); }
+      if (action === "set-enabled") command.enabled = body.enabled !== false;
+      session.commands.push(command); await writeSession(code, session); return reply(res, 200, { status: "queued" });
+    }
+    if (action === "reorder") {
+      const ids = Array.isArray(body.profileIds) ? body.profileIds.map(function (id) { return String(id).slice(0, 80); }) : [], known = (session.device && session.device.lists || []).map(function (item) { return item.id; });
+      if (ids.length !== known.length || new Set(ids).size !== ids.length || ids.some(function (id) { return known.indexOf(id) < 0; })) return reply(res, 400, { error: "A ordem recebida não corresponde às listas da TV." });
+      session.commands.push({ id: newCommandId(), type: "reorder", profileIds: ids, createdAt: Date.now() }); await writeSession(code, session); return reply(res, 200, { status: "queued" });
     }
     if (action === "ack") {
       if (!TOKEN_PATTERN.test(token) || session.token !== token) return reply(res, 403, { error: "TV não autorizada." });

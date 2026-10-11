@@ -24,7 +24,7 @@ O manifesto declara Tizen 4.0 como versão mínima. O player usa AVPlay quando d
 
 O foco foi separado em `js/navigation/`: histórico por perfil e rota, gerenciador de foco, cálculo espacial e eventos do controle remoto. A interface usa IDs estáveis, viewport fixa e `translate3d` para trazer o conteúdo até a região de foco.
 
-Os catálogos renderizam 40 itens por lote. Filmes possuem tela de detalhes e retomada; séries usam temporadas horizontais, progresso por episódio e avanço para o episódio ou temporada seguinte. Lucide fornece os ícones locais da interface.
+Os catálogos usam uma janela virtual de linhas próximas ao foco, mantendo poucas dezenas de cards no DOM mesmo com milhares de itens. Capas são carregadas por uma fila de baixa concorrência e categorias/EPG usam cache local com expiração e limpeza automática.
 
 ## Pareamento pelo celular na Vercel
 
@@ -36,9 +36,13 @@ O projeto inclui a página móvel `/pair`, a função `/api/pair` e a integraç�
 4. Faça o deploy e copie o domínio HTTPS gerado.
 5. Altere `window.PAIRING_SERVER_URL` em `js/pairing-config.js` para esse domínio e gere novamente o pacote Tizen.
 
-Depois disso, a tela inicial e a tela de primeiro acesso mostram o endereço `/pair` e um código de seis números. Abra o endereço no celular, informe o código e gerencie as listas.
+Depois disso, a tela inicial e a tela de primeiro acesso mostram o endereço `/pair` e um código de seis números. Abra o endereço no celular para adicionar, usar, ativar/desativar, renomear, ordenar ou remover listas.
 
-Servidor publicado deste projeto: `https://cinema-noir-pairing.vercel.app`. A hospedagem publica somente o gerenciador móvel e a API; a interface e as configurações do aplicativo Tizen não fazem parte da saída pública.
+Servidor publicado deste projeto: `https://cinema-noir-pairing.vercel.app`. A hospedagem publica o gerenciador móvel, a API de pareamento e o manifesto de versão.
+
+## Atualizações na TV
+
+O aplicativo consulta `/api/version` e permite verificar a versão em Configurações. Por segurança, uma aplicação Tizen instalada em modo desenvolvedor não pode substituir o próprio pacote. Para atualizar sem Tizen Studio, publique cada nova versão no Samsung Apps TV Seller Office com o mesmo Application ID, Package ID e certificado de autor; com atualização automática habilitada na TV, o pacote novo é instalado pelo sistema. O `config.xml` deve sempre receber uma versão superior antes do envio.
 
 ## Validação recomendada na TV
 

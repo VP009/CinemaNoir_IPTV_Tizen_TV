@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Muitos provedores IPTV ainda usam HTTP. O app aceita-o somente porque o usuário informa a origem. -->
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

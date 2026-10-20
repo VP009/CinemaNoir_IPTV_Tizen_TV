@@ -85,7 +85,7 @@
   };
   N.applyPerformanceMode = function () {
     var selected = N.Settings.get("performanceMode"), effective = selected;
-    if (selected === "auto") effective = typeof tizen !== "undefined" ? "speed" : "quality";
+    if (selected === "auto") effective = (typeof tizen !== "undefined" || typeof AndroidPlayer !== "undefined") ? "speed" : "quality";
     document.documentElement.setAttribute("data-performance", effective);
     document.documentElement.setAttribute("data-performance-setting", selected);
     return effective;

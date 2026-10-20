@@ -1,7 +1,7 @@
 (function (N) {
   "use strict";
-  var root, video, av, hideTimer, saveTimer, clockTimer, current, activePlaybackEngine = null, playbackGeneration = 0,
-    scrub = { active: false, target: 0, duration: 0, origin: 0 }, miniAv = null, miniVideo = null, miniPlane = null, miniGeneration = 0, miniItem = null, miniStartTimer = null, queuedMiniItem = null;
+  var root, video, av, hideTimer, saveTimer, clockTimer, current, activePlaybackEngine = null, playbackGeneration = 0, androidPlayback = null,
+    scrub = { active: false, target: 0, duration: 0, origin: 0 }, miniAv = null, miniVideo = null, miniPlane = null, miniGeneration = 0, miniItem = null, miniStartTimer = null, miniResizeTimer = null, queuedMiniItem = null;
   function progressKey() {
     return N.key("progress", current.kind + ":" + N.contentId(current.item));
   }
@@ -74,18 +74,38 @@
   function syncMiniDisplayRect(stage, plane, player) {
     if (!stage || !plane || !player || !player.setDisplayRect) return false;
     var rect = stage.getBoundingClientRect(), viewportWidth = document.documentElement.clientWidth || window.innerWidth || 1920,
-      ratio = 1920 / Math.max(1, viewportWidth), left = Math.max(0, Math.round(rect.left * ratio)), top = Math.max(0, Math.round(rect.top * ratio)),
-      width = Math.max(2, Math.round(rect.width * ratio)), height = Math.max(2, Math.round(rect.height * ratio));
+      viewportHeight = document.documentElement.clientHeight || window.innerHeight || Math.round(viewportWidth * 9 / 16),
+      ratio = 1920 / Math.max(1, viewportWidth),
+      cssLeft = Math.max(0, Math.round(rect.left)), cssTop = Math.max(0, Math.round(rect.top)),
+      cssWidth = Math.max(2, Math.round(Math.min(rect.width, viewportWidth - cssLeft))),
+      cssHeight = Math.max(2, Math.round(Math.min(rect.height, viewportHeight - cssTop))),
+      left = Math.max(0, Math.round(cssLeft * ratio)), top = Math.max(0, Math.round(cssTop * ratio)),
+      width = Math.max(2, Math.round(cssWidth * ratio)), height = Math.max(2, Math.round(cssHeight * ratio));
     width = Math.min(width, 1920 - left); height = Math.min(height, 1080 - top);
-    plane.style.position = "absolute"; plane.style.left = "0px"; plane.style.top = "0px";
-    plane.style.width = "100%"; plane.style.height = "100%"; plane.style.backgroundColor = "transparent";
+    /* AVPlay é um plano nativo. Em TVs Tizen ele fica preto quando o object está
+       dentro de um ancestral com flex, overflow ou transform. A superfície vive
+       no body e é alinhada visualmente ao viewport do mini player. */
+    plane.style.position = "fixed"; plane.style.left = cssLeft + "px"; plane.style.top = cssTop + "px";
+    plane.style.width = cssWidth + "px"; plane.style.height = cssHeight + "px";
+    plane.style.zIndex = "8"; plane.style.pointerEvents = "none"; plane.style.backgroundColor = "transparent";
     if (width < 2 || height < 2) return false;
     player.setDisplayRect(left, top, width, height);
     return true;
   }
+  function scheduleMiniDisplaySync() {
+    clearTimeout(miniResizeTimer);
+    miniResizeTimer = setTimeout(function () {
+      var stage = document.getElementById("live-mini-stage");
+      if (stage && miniPlane && miniAv) {
+        try { syncMiniDisplayRect(stage, miniPlane, miniAv); } catch (error) { console.log("MINI PLAYER RECT ERROR", error); }
+      }
+    }, 80);
+  }
   N.stopLiveMiniPlayer = function () {
     clearTimeout(miniStartTimer);
+    clearTimeout(miniResizeTimer);
     miniStartTimer = null;
+    miniResizeTimer = null;
     queuedMiniItem = null;
     miniGeneration += 1;
     if (miniVideo) {
@@ -139,9 +159,10 @@
       try {
         miniAv = webapis.avplay;
         miniPlane = document.createElement("object");
+        miniPlane.id = "live-mini-av-player";
         miniPlane.type = "application/avplayer";
         miniPlane.className = "live-mini-plane";
-        stage.insertBefore(miniPlane, stage.firstChild);
+        document.body.appendChild(miniPlane);
         miniAv.open(url);
         applyAVBuffer(miniAv, "mini");
         if (!syncMiniDisplayRect(stage, miniPlane, miniAv)) throw new Error("Área da prévia inválida");
@@ -152,7 +173,7 @@
           oncurrentplaytime: function () {}, onstreamcompleted: function () {}, onevent: function () {}, onsubtitlechange: function () {}, ondrmevent: function () {},
           onerror: function () { setMiniVideoVisible(stage, false); setMiniStatus("Não foi possível reproduzir a prévia."); }
         });
-        miniAv.prepareAsync(function () { if (!valid()) return; try { syncMiniDisplayRect(stage, miniPlane, miniAv); if (miniAv.setDisplayMethod) miniAv.setDisplayMethod("PLAYER_DISPLAY_MODE_LETTER_BOX"); miniAv.play(); setMiniVideoVisible(stage, true); setMiniStatus(""); } catch (error) { setMiniVideoVisible(stage, false); setMiniStatus("Falha ao iniciar a prévia."); } }, function () { setMiniVideoVisible(stage, false); setMiniStatus("Prévia indisponível."); });
+        miniAv.prepareAsync(function () { if (!valid()) return; try { if (miniAv.setDisplayMethod) miniAv.setDisplayMethod("PLAYER_DISPLAY_MODE_LETTER_BOX"); miniAv.play(); syncMiniDisplayRect(stage, miniPlane, miniAv); scheduleMiniDisplaySync(); setMiniVideoVisible(stage, true); setMiniStatus(""); } catch (error) { setMiniVideoVisible(stage, false); setMiniStatus("Falha ao iniciar a prévia."); } }, function () { setMiniVideoVisible(stage, false); setMiniStatus("Prévia indisponível."); });
         return true;
       } catch (error) { N.stopLiveMiniPlayer(); miniItem = item; generation = ++miniGeneration; }
     }
@@ -166,6 +187,7 @@
     try { var playing = miniVideo.play(); if (playing && playing.catch) playing.catch(function () { setMiniStatus("Prévia disponível somente na TV."); }); } catch (nativeError) { setMiniStatus("Prévia disponível somente na TV."); }
     return true;
   };
+  if (window.addEventListener) window.addEventListener("resize", scheduleMiniDisplaySync);
   function playbackTime() {
     var position = 0, duration = 0;
     try {
@@ -229,6 +251,37 @@
     var clock = root.querySelector(".player-clock"), now = new Date(), hours = now.getHours(), minutes = now.getMinutes();
     if (clock) clock.textContent = (hours < 10 ? "0" : "") + hours + ":" + (minutes < 10 ? "0" : "") + minutes;
   }
+  function androidPlayerAvailable() {
+    try { return !!(window.AndroidPlayer && typeof window.AndroidPlayer.isAvailable === "function" && window.AndroidPlayer.isAvailable()); }
+    catch (error) { return false; }
+  }
+  function saveAndroidPlayback(playback, result) {
+    if (!playback || playback.kind === "live" || !N.WatchProgressStore) return;
+    var position = Math.max(0, Number(result.positionMs || 0) / 1000), duration = Math.max(0, Number(result.durationMs || 0) / 1000), record = {
+      profileId: N.active && N.active.id, position: position, duration: duration, title: playback.title,
+      item: playback.item, kind: playback.kind, movieId: playback.kind === "movies" ? N.contentId(playback.item) : null,
+      seriesId: playback.options.seriesId || playback.item.series_id || null, seriesName: playback.options.seriesName || playback.title,
+      seriesPoster: playback.options.seriesPoster || playback.item.cover || playback.item.stream_icon || null,
+      episodeId: playback.kind === "episode" ? N.contentId(playback.item) : null,
+      seasonNumber: playback.options.seasonNumber || playback.item.season || null, episodeNumber: playback.item.episode_num || null,
+      pending: !duration, updatedAt: Date.now()
+    };
+    if (playback.kind === "episode") N.WatchProgressStore.saveEpisodeProgress(record);
+    else if (playback.kind === "movies") N.WatchProgressStore.saveMovieProgress(record);
+  }
+  N.onAndroidPlaybackResult = function (result) {
+    result = result || {};
+    var playback = androidPlayback;
+    androidPlayback = null;
+    if (!playback) return;
+    if (result.error) { N.toast(result.error); return; }
+    saveAndroidPlayback(playback, result);
+    if (result.completed && playback.kind === "episode") {
+      N.WatchProgressStore.completeEpisode(N.contentId(playback.item));
+      if (playback.options.nextItem) N.WatchProgressStore.queueNextEpisode({ profileId: N.active.id, seriesId: playback.options.seriesId, seriesName: playback.options.seriesName, seriesPoster: playback.options.seriesPoster, seasonNumber: playback.options.nextSeasonNumber || playback.options.nextItem.season, episodeNumber: playback.options.nextItem.episode_num, episodeId: N.contentId(playback.options.nextItem), item: playback.options.nextItem, title: playback.options.nextItem.title || playback.options.seriesName });
+      if (playback.options.next) setTimeout(playback.options.next, 0);
+    } else if (result.completed && playback.kind === "movies") N.WatchProgressStore.completeMovie(N.contentId(playback.item));
+  };
   N.playerActivity = function () {
     if (!root) return;
     var ui = root.querySelector(".player-ui");
@@ -251,10 +304,19 @@
   };
   N.openPlayer = function (kind, item, title, options) {
     if (N.stopLiveMiniPlayer) N.stopLiveMiniPlayer();
+    options = options || {};
+    if (androidPlayerAvailable()) {
+      var androidSaved = kind === "episode" ? N.WatchProgressStore.getEpisodeProgress(N.contentId(item)) : kind === "movies" ? N.WatchProgressStore.getMovieProgress(N.contentId(item)) : null;
+      androidPlayback = { kind: kind, item: item, title: title, options: options };
+      try {
+        window.AndroidPlayer.play(JSON.stringify({ url: String(N.streamUrl(kind, item) || "").trim(), title: title || "Cinema Noir", positionMs: androidSaved && !androidSaved.completed ? Math.round(Number(androidSaved.position || 0) * 1000) : 0, live: kind === "live" }));
+        return;
+      } catch (androidError) { androidPlayback = null; }
+    }
     if (root) N.closePlayer(true);
     playbackGeneration++;
     if (N.focusHistory) N.focusHistory.capture();
-    current = { kind: kind, item: item, title: title, options: options || {} };
+    current = { kind: kind, item: item, title: title, options: options };
     N.playerActive = true;
     root = document.createElement("div");
     root.className = "player player-page";

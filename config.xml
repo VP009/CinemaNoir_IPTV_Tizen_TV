@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="https://cinemanoir.local" version="1.3.0" viewmodes="maximized">
+<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="https://cinemanoir.local" version="1.3.1" viewmodes="maximized">
   <tizen:application id="CnNoir2026.CinemaNoir" package="CnNoir2026" required_version="4.0"/>
-  <content src="index.html"/>
-  <name>Cinema Noir</name><icon src="icon.png"/>
+  <content src="app/index.html"/>
+  <name>Cinema Noir</name><icon src="app/icon.png"/>
   <access origin="*" subdomains="true"/>
   <tizen:profile name="tv-samsung"/>
   <feature name="http://tizen.org/feature/screen.size.all"/>

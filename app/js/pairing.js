@@ -70,7 +70,7 @@
     }
     return Promise.reject(new Error("Comando desconhecido."));
   }
-  N.pairingMarkup = function () { return '<div class="home-pairing"><span>Gerencie listas pelo celular</span><strong class="pairing-url">' + baseUrl() + '/pair</strong><small class="pairing-status">Preparando código…</small></div>'; };
+  N.pairingMarkup = function (placement) { return '<div class="home-pairing' + (placement === "login" ? " login-pairing" : "") + '"><span>Gerencie listas pelo celular</span><strong class="pairing-url">' + baseUrl() + '/pair</strong><small class="pairing-status">Preparando código…</small></div>'; };
   N.stopPairing = function () { session += 1; processing = false; if (timer) clearInterval(timer); timer = null; };
   N.startPairing = function () {
     N.stopPairing(); if (!document.querySelector(".home-pairing")) return;

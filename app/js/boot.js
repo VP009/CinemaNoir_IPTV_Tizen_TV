@@ -15,6 +15,11 @@
 	Noir.started = false;
 	function startApplication() {
 		try {
+			/* A WebView do APK usa a mesma interface da TV Samsung, mas em TV Boxes
+			   o perfil de desenho leve evita atraso entre comandos do D-pad. */
+			if (typeof window.AndroidPlayer !== "undefined") {
+				document.documentElement.classList.add("android-tv");
+			}
 			if (Noir.cleanupOldData) Noir.cleanupOldData();
 			if (typeof tizen !== "undefined" && tizen.tvinputdevice) {
 				document.documentElement.classList.add("tizen-device");

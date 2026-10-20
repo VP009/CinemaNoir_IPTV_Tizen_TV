@@ -1,0 +1,4 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/tv_banner_background" />
+    <item android:gravity="center" android:drawable="@drawable/app_icon" android:width="96dp" android:height="96dp" />
+</layer-list>

@@ -22,7 +22,7 @@ async function main() {
     Image: function () { probes.push(this); }, URL: { createObjectURL() {}, revokeObjectURL() {} },
     Promise, Object, Array, String, Number, Math, Date
   };
-  vm.runInNewContext(fs.readFileSync("js/performance.js", "utf8"), context);
+  vm.runInNewContext(fs.readFileSync("app/js/performance.js", "utf8"), context);
 
   const titles = [{ name: "Ação Total" }, { title: "Coração Valente" }];
   N.prepareCatalogSearchIndex(titles);
@@ -49,7 +49,7 @@ async function main() {
     Noir: coreN, localStorage: storage(), XMLHttpRequest: XHR, Promise, Object, Array, String, Number, Math, Date,
     encodeURIComponent, setTimeout, clearTimeout
   };
-  vm.runInNewContext(fs.readFileSync("js/core.js", "utf8"), coreContext);
+  vm.runInNewContext(fs.readFileSync("app/js/core.js", "utf8"), coreContext);
   const request = coreN.request({ baseUrl: "server", username: "u", password: "p" }, "test");
   request.catch(() => {}); request.abort();
   assert.equal(aborted, true, "a requisição antiga deve ser abortável");

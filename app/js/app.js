@@ -196,7 +196,7 @@
       ? { name: edit.name, baseUrl: edit.baseUrl, username: edit.username, password: edit.password }
       : { name: "UltraCDN SBS", baseUrl: "http://ultracdn.sbs", username: "707407823", password: "481977783" };
     getApp().innerHTML =
-      '<div class="viewport"><div class="content"><div class="panel form"><div class="eyebrow">Cinema Noir</div><h1>' +
+      '<div class="viewport login-viewport"><div class="content">' + (!edit && N.pairingMarkup ? N.pairingMarkup("login") : "") + '<div class="panel form"><div class="eyebrow">Cinema Noir</div><h1>' +
       (edit ? "Editar lista" : "Adicionar sua lista Xtream") +
       '</h1><p>Os dados ficam armazenados somente nesta TV.</p><label class="field"><span>Nome da lista</span><input id="name" value="' +
       esc(defaults.name) +
@@ -210,7 +210,7 @@
       (N.profiles.length
         ? '<button data-route="settings">Cancelar</button>'
         : "") +
-      '</div><p id="login-error" class="error"></p></div>' + (!edit && N.pairingMarkup ? N.pairingMarkup() : "") + '</div></div>';
+      '</div><p id="login-error" class="error"></p></div></div></div>';
     wireCommon();
     getApp().querySelectorAll("input").forEach(function (i) {
       i.readOnly = true;

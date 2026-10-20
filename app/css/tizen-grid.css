@@ -424,8 +424,10 @@ header .active-profile{margin-left:auto;padding:9px 16px;border:1px solid rgba(1
 .live-preview{display:flex!important;min-height:0;flex-direction:column;padding:16px!important}
 .live-mini-stage{position:relative;flex:0 0 42%;min-height:210px;overflow:hidden;border:1px solid var(--border);border-radius:14px;background:#000}
 .live-mini-stage>img{width:100%;height:100%;object-fit:contain;background:var(--bg-secondary)}
-.live-mini-plane,.live-mini-video{position:absolute;left:0;top:0;width:100%;height:100%;z-index:2;background:transparent!important;object-fit:contain}
+.live-mini-plane{position:fixed;background:transparent!important;pointer-events:none}
+.live-mini-video{position:absolute;left:0;top:0;width:100%;height:100%;z-index:2;background:transparent!important;object-fit:contain}
 .live-mini-stage.mini-playing>img{visibility:hidden}
+.live-mini-stage.mini-playing{background:transparent!important}
 #live-mini-status{position:absolute;left:50%;top:50%;z-index:3;transform:translate(-50%,-50%);padding:9px 13px;border-radius:9px;background:rgba(7,6,11,.82);font-size:16px;white-space:nowrap}
 .live-playing-title{display:block;margin:10px 0 2px;color:var(--purple-light);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .live-preview h2{margin:2px 0 8px;font-size:25px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -733,7 +735,8 @@ html[data-theme] .keyboard button:focus,html[data-theme] .keyboard button[data-f
 html[data-theme] .keyboard .row button:last-child{background:var(--theme-accent-strong);color:var(--theme-focus-text)}
 html[data-theme] .star{background:var(--theme-favorite-bg);border-color:var(--theme-favorite-edge);box-shadow:0 5px 16px var(--theme-shadow)}
 html[data-theme] .star .ui-icon,html[data-theme] .favorite-active{color:var(--theme-favorite);fill:var(--theme-favorite);stroke:var(--theme-favorite-edge)}
-html[data-theme] .live-mini-stage,html[data-theme] .live-mini-plane,html[data-theme] .live-mini-video,html[data-theme] .video-player{background:#000}
+html[data-theme] .live-mini-stage,html[data-theme] .live-mini-video,html[data-theme] .video-player{background:#000}
+html[data-theme] .live-mini-plane{background:transparent!important}
 html[data-theme] #live-mini-status{background:var(--theme-overlay);border:1px solid var(--theme-border);color:var(--text)}
 html[data-theme] .epg-item{border-color:var(--theme-border-soft)}
 html[data-theme] .epg-now{border-left-color:var(--theme-accent);background:var(--theme-accent-faint)}
@@ -895,6 +898,90 @@ html.tizen-device.fast-navigation .title-marquee.is-overflowing{
   transform:translate3d(0,0,0)!important;
 }
 html.tizen-device .poster.focused .title-marquee.is-overflowing,html.tizen-device .poster[data-focused="true"] .title-marquee.is-overflowing{-webkit-animation-delay:600ms;animation-delay:600ms}
+/* Android TV: o mesmo caminho de pintura leve do Tizen. Em TV Boxes de entrada,
+   blur, sombra e transições de cada card acumulam atraso durante o D-pad. */
+html.android-tv{--focus-duration:0ms;--scroll-duration:0ms}
+html.android-tv .media-grid,
+html.android-tv .category-list,
+html.android-tv .episode-grid,
+html.android-tv .season-list,
+html.android-tv .vertical-track,
+html.android-tv .horizontal-track{
+  -webkit-backface-visibility:hidden;
+  backface-visibility:hidden;
+  will-change:transform;
+  transition:none!important;
+}
+html.android-tv .poster,
+html.android-tv .category-item,
+html.android-tv .episode,
+html.android-tv .season-button,
+html.android-tv .home-card,
+html.android-tv button,
+html.android-tv button .ui-icon,
+html.android-tv .progressive-image{transition:none!important}
+html.android-tv .poster.focused,
+html.android-tv .poster[data-focused="true"],
+html.android-tv .category-item.focused,
+html.android-tv .category-item[data-focused="true"],
+html.android-tv .episode.focused,
+html.android-tv .episode[data-focused="true"],
+html.android-tv .season-button.focused,
+html.android-tv .season-button[data-focused="true"],
+html.android-tv .home-card.focused,
+html.android-tv .home-card[data-focused="true"]{
+  outline:3px solid var(--theme-accent,var(--purple));
+  outline-offset:-3px;
+  box-shadow:none!important;
+  filter:none!important;
+  transform:none!important;
+}
+html.android-tv .panel,
+html.android-tv .live-preview,
+html.android-tv .poster,
+html.android-tv .home-card{box-shadow:none!important}
+html.android-tv .series-backdrop{filter:none!important;opacity:.2}
+html.android-tv .title-marquee.is-overflowing{-webkit-animation:none!important;animation:none!important}
+
+/* A tela inicial de cadastro não passa pelo layout de páginas. Antes ela
+   herdava as margens verticais legadas e perdia a metade inferior em 720p. */
+html.android-tv .login-viewport{
+  top:0!important;right:0!important;bottom:0!important;left:0!important;
+  display:flex;align-items:center;justify-content:center;padding:18px 5%!important;
+}
+html.android-tv .login-viewport>.content{
+  display:flex;width:100%;max-width:780px;height:auto;min-height:0;flex-direction:column;align-items:stretch;gap:10px;padding:0!important;
+}
+html.android-tv .login-viewport .form{
+  width:100%;max-width:none;margin:0;padding:18px 24px;
+}
+html.android-tv .login-viewport .home-pairing{
+  position:static;min-width:0;max-width:none;width:100%;flex:0 0 auto;transform:none;
+  flex-direction:row;align-items:center;justify-content:center;gap:12px;padding:10px 16px;text-align:center;
+}
+html.android-tv .login-viewport .pairing-url{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html.android-tv .login-viewport .pairing-status{font-weight:700;color:var(--theme-accent,var(--purple-light))}
+html.android-tv .login-viewport .form h1{margin:3px 0 7px;font-size:30px}
+html.android-tv .login-viewport .form p{margin:5px 0;font-size:17px;line-height:1.25}
+html.android-tv .login-viewport .field{margin:7px 0}
+html.android-tv .login-viewport .field span{margin-bottom:3px;font-size:16px}
+html.android-tv .login-viewport input{padding:9px 12px}
+html.android-tv .login-viewport .row{margin:10px 0;gap:12px}
+html.android-tv .login-viewport button{padding:11px 16px}
+@media (max-height:800px){
+  html.android-tv .login-viewport{padding:10px 4%!important}
+  html.android-tv .login-viewport>.content{gap:7px}
+  html.android-tv .login-viewport .form{padding:13px 20px}
+  html.android-tv .login-viewport .form h1{font-size:26px}
+  html.android-tv .login-viewport .form p{font-size:15px}
+  html.android-tv .login-viewport .field{margin:5px 0}
+  html.android-tv .login-viewport input{padding:7px 10px}
+  html.android-tv .login-viewport .row{margin:7px 0}
+  html.android-tv .login-viewport .home-pairing{gap:8px;padding:8px 12px;font-size:13px}
+}
+@media (max-width:1100px){
+  html.android-tv .login-viewport .home-pairing{flex-wrap:wrap}
+}
 html[data-performance="speed"] .series-backdrop{filter:none!important;opacity:.2}
 html[data-performance="speed"] .panel,html[data-performance="speed"] .live-preview,html[data-performance="speed"] .poster,html[data-performance="speed"] .home-card{box-shadow:none!important}
 html[data-performance="speed"] .progressive-image{transition:none!important}
